@@ -1,0 +1,11 @@
+{
+  "name": "VibeChat",
+  "description": "Meet New People. Share Your Vibe. Stranger chat platform with text, audio, and video calling.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
