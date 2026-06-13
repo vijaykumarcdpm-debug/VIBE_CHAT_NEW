@@ -579,7 +579,7 @@ export default function App() {
 
       } else {
         console.error(`[VibeChat Auth Error] fetchLatestProfile responded with negative status: ${res.status}`);
-        if (res.status === 401 || res.status === 403 || res.status === 404) {
+        if (res.status === 401) {
           console.warn('[VibeChat Auth Error] User credentials rejected. Logging out...');
           localStorage.removeItem('vibechat_token');
           localStorage.removeItem('vibechat_saved_token');
