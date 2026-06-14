@@ -910,6 +910,11 @@ export default function App() {
       localStorage.removeItem('vibechat_saved_type');
     }
     localStorage.removeItem('vibechat_token');
+    localStorage.removeItem('vibechat_saved_token');
+    localStorage.removeItem('vibechat_saved_type');
+    localStorage.removeItem('vibechat_rejoin_token');
+    localStorage.removeItem('vibechat_rejoin_username');
+    localStorage.removeItem('vibechat_rejoin_type');
     setToken(null);
     setMe(null);
     setScreen('lobby');
@@ -924,8 +929,13 @@ export default function App() {
     const savedType = localStorage.getItem('vibechat_saved_type');
     if (savedToken && savedType && types.includes(savedType)) {
       localStorage.setItem('vibechat_token', savedToken);
-      setToken(savedToken);
-      return true;
+setToken(savedToken);
+
+setTimeout(() => {
+  fetchLatestProfile();
+}, 500);
+
+return true;
     }
     return false;
   };
