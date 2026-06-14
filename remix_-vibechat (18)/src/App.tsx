@@ -1483,21 +1483,14 @@ return true;
   const tok = localStorage.getItem('vibechat_rejoin_token');
 
   if (tok) {
-
-    window.history.pushState(
-      { vibechat: 'lobby' },
-      '',
-      window.location.pathname
-    );
+    localStorage.setItem('vibechat_token', tok);
 
     setToken(tok);
-    setScreen('lobby');
 
-    showToast(
-      'Welcome back! Direct transport to Initial People Lobby completed.'
-    );
-  }
-}}
+    setTimeout(() => {
+        fetchLatestProfile();
+    }, 500);
+}
           />
         )
       ) : (

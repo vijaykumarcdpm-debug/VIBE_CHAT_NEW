@@ -673,12 +673,15 @@ APP.get('/api/auth/me', authenticateToken, (req: any, res) => {
         profilePic: req.user.profilePic || defaultPic,
         online: true,
         type: type,
-        city: 'VibeChat Lounge',
-        state: 'Online',
-        country: 'Worldwide',
-        originalCity: 'VibeChat Lounge',
-        originalState: 'Online',
-        originalCountry: 'Worldwide',
+       city: req.user.city || '',
+state: req.user.state || '',
+country: req.user.country || '',
+
+originalCity: req.user.originalCity || req.user.city || '',
+originalState: req.user.originalState || req.user.state || '',
+originalCountry: req.user.originalCountry || req.user.country || '',
+bio: req.user.bio || '',
+age: req.user.age || undefined,
         createdAt: new Date().toISOString()
       };
       dbManager.addUser(user);
