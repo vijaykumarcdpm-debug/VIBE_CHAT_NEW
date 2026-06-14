@@ -1490,7 +1490,7 @@ return true;
     setTimeout(() => {
         fetchLatestProfile();
     }, 500);
-}
+}}
           />
         )
       ) : (
