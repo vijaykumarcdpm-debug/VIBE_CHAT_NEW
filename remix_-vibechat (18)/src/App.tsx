@@ -1479,19 +1479,19 @@ return true;
               setTheme(nextTheme);
               localStorage.setItem('vibechat_theme', nextTheme);
             }}
-            onRejoin={() => {
+           onRejoin={() => {
   const tok = localStorage.getItem('vibechat_rejoin_token');
 
   if (tok) {
     localStorage.setItem('vibechat_token', tok);
-
     setToken(tok);
 
     setTimeout(() => {
-        fetchLatestProfile();
+      fetchLatestProfile();
     }, 500);
-}}}
-        />
+  }
+}}
+/>
       ) : (
         <div className="flex-1 min-h-0 flex flex-col justify-between w-full max-w-full">
           
