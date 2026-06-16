@@ -40,7 +40,15 @@ export default function App() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
   const reconnectTimeoutRef = useRef<any>(null);
+  const authRetryTimeoutRef = useRef<any>(null);
   const tokenRef = useRef<string | null>(null);
+
+  const clearAuthRetryTimer = () => {
+    if (authRetryTimeoutRef.current) {
+      clearTimeout(authRetryTimeoutRef.current);
+      authRetryTimeoutRef.current = null;
+    }
+  };
 
   // Global app indicators
   const [globalStats, setGlobalStats] = useState<SystemStats | null>(null);
@@ -607,6 +615,11 @@ export default function App() {
     return savedToken || rejoinToken || tokenRef.current || null;
   };
 
+  const isAuthTokenPresent = () => {
+    const currentToken = getActiveAuthToken();
+    return !!currentToken && currentToken.trim().length > 0;
+  };
+
   const loadRejoinSnapshot = (): Partial<UserProfile> | null => {
     const token = localStorage.getItem('vibechat_rejoin_token');
     if (!token) return null;
@@ -692,8 +705,11 @@ export default function App() {
 
   const fetchLatestProfile = async () => {
     // Read token from localStorage to avoid race condition with tokenRef sync
-const currentToken = getActiveAuthToken();
-    if (!currentToken) return;
+    const currentToken = getActiveAuthToken();
+    if (!currentToken || currentToken.trim().length === 0) {
+      clearAuthRetryTimer();
+      return;
+    }
     tokenRef.current = currentToken;
     try {
       const res = await fetch('/api/auth/me', {
@@ -744,19 +760,25 @@ const currentToken = getActiveAuthToken();
           return;
         }
         if (res.status === 401 || res.status === 403 || res.status === 404) {
-          console.warn('[VibeChat Auth Error] User credentials rejected. Logging out...');
+          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing invalid tokens and stopping retry.');
+          clearAuthRetryTimer();
           localStorage.removeItem('vibechat_token');
+          localStorage.removeItem('vibechat_rejoin_token');
           localStorage.removeItem('vibechat_saved_token');
           localStorage.removeItem('vibechat_saved_type');
+          tokenRef.current = null;
+          setToken(null);
           handleLogout();
         } else {
           console.warn('[VibeChat Auth Error] Server temporary issue. Preserving token and scheduling retry...');
-          setTimeout(fetchLatestProfile, 4000);
+          clearAuthRetryTimer();
+          authRetryTimeoutRef.current = setTimeout(fetchLatestProfile, 4000);
         }
       }
     } catch (e) {
       console.error('[VibeChat Auth Network Error] fetchLatestProfile request threw an error:', e);
-      setTimeout(fetchLatestProfile, 4000);
+      clearAuthRetryTimer();
+      authRetryTimeoutRef.current = setTimeout(fetchLatestProfile, 4000);
     }
   };
 
@@ -1080,6 +1102,7 @@ const currentToken = getActiveAuthToken();
   };
 
   const handleLogout = () => {
+    clearAuthRetryTimer();
     if (token && me && me.type !== 'Guest') {
       localStorage.setItem('vibechat_saved_token', token);
       localStorage.setItem('vibechat_saved_type', me.type);
