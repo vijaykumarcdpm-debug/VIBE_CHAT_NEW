@@ -1916,7 +1916,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">PEOPLE</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">PEOPLE_TEST</span>
                           </button>
 
                           <button
@@ -1935,7 +1935,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">CHAT</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">CHAT_TEST</span>
                           </button>
 
                           <button
@@ -1947,7 +1947,7 @@ export default function App() {
                             }`}
                           >
                             <Smile className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">MATCHING ROOM</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">MATCHING_TEST</span>
                           </button>
 
                           <button
@@ -1959,7 +1959,7 @@ export default function App() {
                             }`}
                           >
                             <Sparkles className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">UPGRADE VIP</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">VIP_TEST</span>
                           </button>
                         </nav>
                       )}

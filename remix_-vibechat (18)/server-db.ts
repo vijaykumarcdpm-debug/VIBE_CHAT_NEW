@@ -32,7 +32,7 @@ interface DiskDatabase {
 // Initial default configuration
 const DEFAULT_CONFIG: PlatformConfig = {
   homepageTitle: "VibeChat",
-  homepageTagline: "hello 123. Share Your Vibe.",
+  homepageTagline: "Meet New People. Share Your Vibe.",
   announcement: "🎉 Welcome to VibeChat! Upgrade to Royal VIP to access gender and location filters, unlimited recent chats, and priority stranger matching!",
   communityRules: [
     "No explicit or adult content on public profiles or streams.",
