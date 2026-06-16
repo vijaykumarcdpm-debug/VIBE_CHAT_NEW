@@ -12,7 +12,7 @@
       "online": false,
       "type": "Admin",
       "createdAt": "2026-06-04T16:31:05.354Z",
-      "lastSeenAt": "2026-06-05T19:37:30.941Z",
+      "lastSeenAt": "2026-06-16T08:36:16.940Z",
       "bio": "VibeChat Admin for Help"
     },
     {
@@ -220,6 +220,25 @@
       "type": "Guest",
       "createdAt": "2026-06-13T08:50:33.604Z",
       "lastSeenAt": "2026-06-13T09:41:35.933Z",
+      "bio": ""
+    },
+    {
+      "id": "guest_1781534272676_992",
+      "username": "broo",
+      "deviceId": "a23d83d1-5654-49b3-ba91-d82052f751e5",
+      "gender": "Male",
+      "age": 45,
+      "profilePic": "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&top=shortWaved&facialHair=beardLight&facialHairProbability=100&backgroundColor=b6e3f4",
+      "city": "Davangere",
+      "state": "Karnataka",
+      "country": "India",
+      "originalCity": "Davangere",
+      "originalState": "Karnataka",
+      "originalCountry": "India",
+      "online": false,
+      "type": "Guest",
+      "createdAt": "2026-06-15T14:37:52.676Z",
+      "lastSeenAt": "2026-06-16T05:43:03.691Z",
       "bio": ""
     }
   ],

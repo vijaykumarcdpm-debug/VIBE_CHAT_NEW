@@ -40,6 +40,7 @@ export default function App() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
   const reconnectTimeoutRef = useRef<any>(null);
+  const tokenRef = useRef<string | null>(null);
 
   // Global app indicators
   const [globalStats, setGlobalStats] = useState<SystemStats | null>(null);
@@ -378,10 +379,10 @@ export default function App() {
     editBio.trim()
   );
 
-  localStorage.setItem(
-    'vibechat_rejoin_age',
-    String(ageNum || '')
-  );
+    localStorage.setItem(
+      'vibechat_rejoin_age',
+      String(ageNum || 0) // Ensure a number is stored, even if it's 0.
+    );
 
   if (editPic) {
     localStorage.setItem(
@@ -542,9 +543,33 @@ export default function App() {
   useEffect(() => {
     const savedToken = localStorage.getItem('vibechat_token');
     if (savedToken) {
+      tokenRef.current = savedToken;
       setToken(savedToken);
+      return;
+    }
+
+    // If no active token, try rejoin token (one-click rejoin) or saved token (remember-me)
+    const rejoinToken = localStorage.getItem('vibechat_rejoin_token');
+    if (rejoinToken) {
+      // ensure primary token key is populated and set state
+      try { localStorage.setItem('vibechat_token', rejoinToken); } catch (e) {}
+      tokenRef.current = rejoinToken;
+      setToken(rejoinToken);
+      return;
+    }
+
+    const remembered = localStorage.getItem('vibechat_saved_token');
+    if (remembered) {
+      try { localStorage.setItem('vibechat_token', remembered); } catch (e) {}
+      tokenRef.current = remembered;
+      setToken(remembered);
+      return;
     }
   }, []);
+
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   useEffect(() => {
     if (token) {
@@ -576,6 +601,85 @@ export default function App() {
     }
   };
 
+  const getActiveAuthToken = () => {
+    const savedToken = localStorage.getItem('vibechat_token');
+    const rejoinToken = localStorage.getItem('vibechat_rejoin_token');
+    return savedToken || rejoinToken || tokenRef.current || null;
+  };
+
+  const loadRejoinSnapshot = (): Partial<UserProfile> | null => {
+    const token = localStorage.getItem('vibechat_rejoin_token');
+    if (!token) return null;
+
+    const username = localStorage.getItem('vibechat_rejoin_username') || 'Guest';
+    const type = (localStorage.getItem('vibechat_rejoin_type') as UserProfile['type']) || 'Guest';
+    const gender = (localStorage.getItem('vibechat_rejoin_gender') as UserProfile['gender']) || 'Other';
+    const city = localStorage.getItem('vibechat_rejoin_city') || detectedGeo.city || '';
+    const state = localStorage.getItem('vibechat_rejoin_state') || detectedGeo.state || '';
+    const country = localStorage.getItem('vibechat_rejoin_country') || detectedGeo.country || '';
+    const ageValue = parseInt(localStorage.getItem('vibechat_rejoin_age') || '0', 10);
+
+    return {
+      id: localStorage.getItem('vibechat_rejoin_id') || '',
+      username,
+      type,
+      gender,
+      city,
+      state,
+      country,
+      profilePic: localStorage.getItem('vibechat_rejoin_profilePic') || '',
+      bio: localStorage.getItem('vibechat_rejoin_bio') || '',
+      age: Number.isNaN(ageValue) ? undefined : ageValue,
+      online: true,
+      createdAt: localStorage.getItem('vibechat_rejoin_createdAt') || new Date().toISOString(),
+      blockedUsers: []
+    };
+  };
+
+  const saveRejoinSnapshot = (profile: Partial<UserProfile>, token: string) => {
+    if (!token) return;
+    if (profile.id) {
+      localStorage.setItem('vibechat_rejoin_id', profile.id);
+    }
+    localStorage.setItem('vibechat_rejoin_token', token);
+    if (profile.username) {
+      localStorage.setItem('vibechat_rejoin_username', profile.username);
+    }
+    localStorage.setItem('vibechat_rejoin_type', profile.type || 'Guest');
+    if (profile.gender) {
+      localStorage.setItem('vibechat_rejoin_gender', profile.gender);
+    }
+    if (profile.city) {
+      localStorage.setItem('vibechat_rejoin_city', profile.city);
+    }
+    if (profile.state) {
+      localStorage.setItem('vibechat_rejoin_state', profile.state);
+    }
+    if (profile.country) {
+      localStorage.setItem('vibechat_rejoin_country', profile.country);
+    }
+    if (profile.bio) {
+      localStorage.setItem('vibechat_rejoin_bio', profile.bio);
+    }
+    if (profile.age !== undefined) {
+      localStorage.setItem('vibechat_rejoin_age', String(profile.age));
+    }
+    if (profile.profilePic) {
+      localStorage.setItem('vibechat_rejoin_profilePic', profile.profilePic);
+    }
+    if (profile.createdAt) {
+      localStorage.setItem('vibechat_rejoin_createdAt', profile.createdAt);
+    } else if (!localStorage.getItem('vibechat_rejoin_createdAt')) {
+      localStorage.setItem('vibechat_rejoin_createdAt', new Date().toISOString());
+    }
+  };
+
+  useEffect(() => {
+    if (screen === 'lobby' && sidebarTab === 'people') {
+      fetchStats();
+    }
+  }, [screen, sidebarTab]);
+
   useEffect(() => {
     if (!ws) return;
     const interval = setInterval(() => {
@@ -587,19 +691,26 @@ export default function App() {
   }, [ws]);
 
   const fetchLatestProfile = async () => {
-    if (!token) return;
+    // Read token from localStorage to avoid race condition with tokenRef sync
+const currentToken = getActiveAuthToken();
+    if (!currentToken) return;
+    tokenRef.current = currentToken;
     try {
       const res = await fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${currentToken}` }
       });
 
       if (res.ok) {
         const profile = await res.json();
         setMe(profile);
-        connectWebSocket(profile.id);
+        saveRejoinSnapshot(profile, currentToken);
+        if (profile.city && profile.state && profile.country) {
+          setDetectedGeo({ city: profile.city, state: profile.state, country: profile.country });
+        }
+        connectWebSocket(profile.id, currentToken);
 
         const claimsRes = await fetch('/api/admin/payments', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${currentToken}` }
         }).catch(() => null);
         if (claimsRes && claimsRes.ok) {
           const payments = await claimsRes.json();
@@ -613,7 +724,7 @@ export default function App() {
         }
 
         const qrRes = await fetch('/api/config/public', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${currentToken}` }
         }).catch(() => null);
         if (qrRes && qrRes.ok) {
           const config = await qrRes.json();
@@ -624,6 +735,14 @@ export default function App() {
 
       } else {
         console.error(`[VibeChat Auth Error] fetchLatestProfile responded with negative status: ${res.status}`);
+        const rejoinToken = localStorage.getItem('vibechat_rejoin_token');
+        if ((res.status === 401 || res.status === 403 || res.status === 404) && rejoinToken && rejoinToken !== currentToken) {
+          console.warn('[VibeChat Auth Error] Primary token invalid. Retrying with rejoin token.');
+          try { localStorage.setItem('vibechat_token', rejoinToken); } catch (e) {}
+          tokenRef.current = rejoinToken;
+          setToken(rejoinToken);
+          return;
+        }
         if (res.status === 401 || res.status === 403 || res.status === 404) {
           console.warn('[VibeChat Auth Error] User credentials rejected. Logging out...');
           localStorage.removeItem('vibechat_token');
@@ -641,11 +760,14 @@ export default function App() {
     }
   };
 
-  const connectWebSocket = (userId: string) => {
+  const connectWebSocket = (userId: string, tokenOverride?: string) => {
     if (ws) return;
 
+    const wsToken = tokenOverride || tokenRef.current || localStorage.getItem('vibechat_token');
+    if (!wsToken) return;
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}?token=${token}`;
+    const wsUrl = `${protocol}//${window.location.host}?token=${wsToken}`;
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
@@ -781,13 +903,14 @@ export default function App() {
       console.warn(`[VibeChat WebSocket] Connection closed (code: ${event.code}, reason: ${event.reason || 'none'}).`);
       setWs(null);
       
-      if (token) {
+      const reconnectToken = tokenRef.current || localStorage.getItem('vibechat_token');
+      if (reconnectToken) {
         setIsReconnecting(true);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
-          if (token && userId) {
+          if (userId) {
             console.log('[VibeChat WebSocket] Launching reconnection attempt...');
-            connectWebSocket(userId);
+            connectWebSocket(userId, reconnectToken);
           }
         }, 3000);
       }
@@ -861,10 +984,20 @@ export default function App() {
       if (res.ok) {
         const body = await res.json();
         localStorage.setItem('vibechat_token', body.token);
-        localStorage.setItem('vibechat_rejoin_token', body.token);
-        localStorage.setItem('vibechat_rejoin_username', userName);
-        localStorage.setItem('vibechat_rejoin_type', 'Guest');
         setToken(body.token);
+        saveRejoinSnapshot(body.user || {
+          id: body.user?.id || '',
+          username: userName,
+          type: 'Guest',
+          gender,
+          city: lCity,
+          state: lState,
+          country: lCountry,
+          profilePic: profilePic || '',
+          age: age || undefined,
+          bio: ''
+        }, body.token);
+        fetchStats();
         showToast(`Welcome Guest, ${userName}!`);
       } else {
         const err = await res.json();
@@ -914,10 +1047,10 @@ export default function App() {
     if (res.ok) {
       const body = await res.json();
       localStorage.setItem('vibechat_token', body.token);
-      localStorage.setItem('vibechat_rejoin_token', body.token);
-      localStorage.setItem('vibechat_rejoin_username', body.user.username);
-      localStorage.setItem('vibechat_rejoin_type', body.user.type || 'Registered');
       setToken(body.token);
+      tokenRef.current = body.token;
+      saveRejoinSnapshot(body.user, body.token);
+      fetchStats();
       showToast(`Welcome Back, ${body.user.type === 'Admin' ? 'VibeChat ADMIN' : body.user.username}! Secure connection approved.`);
     } else {
       const err = await res.json();
@@ -935,10 +1068,10 @@ export default function App() {
     if (res.ok) {
       const body = await res.json();
       localStorage.setItem('vibechat_token', body.token);
-      localStorage.setItem('vibechat_rejoin_token', body.token);
-      localStorage.setItem('vibechat_rejoin_username', body.user.username);
-      localStorage.setItem('vibechat_rejoin_type', body.user.type || 'Registered');
       setToken(body.token);
+      tokenRef.current = body.token;
+      saveRejoinSnapshot(body.user, body.token);
+      fetchStats();
       showToast(`Congratulations ${body.user.type === 'Admin' ? 'VibeChat ADMIN' : body.user.username}, account setup successful!`);
     } else {
       const err = await res.json();
@@ -961,6 +1094,7 @@ export default function App() {
     closeSocket();
     setActiveCall(null);
     setIncomingCall(null);
+    fetchStats();
     showToast('Securely disconnected from VibeChat Lobby');
   };
 
@@ -1184,7 +1318,7 @@ export default function App() {
               <p className={`text-xs ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Please read and agree to our rules before accessing the chat companion dashboard.</p>
             </div>
 
-            <div className={`p-4 rounded-2xl text-left space-y-3 pt-3 text-xs ${theme === 'light' ? 'bg-slate-50 border border-slate-200 text-slate-700' : 'bg-slate-950/60 border border-slate-800 text-slate-300'}`}>
+            <div className={`p-4 rounded-2xl text-left space-y-3 pt-3 text-xs ${theme === 'light' ? 'bg-slate-50 border border-slate-200 text-slate-700' : 'bg-slate-950/60 border border-slate-800 text-slate-200'}`}>
               {[
                 "1. Be respectful and kind to all members.",
                 "2. No inappropriate or sexual content in profiles/public areas.",
@@ -1233,7 +1367,7 @@ export default function App() {
                 <p className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest mt-1">Admin Security Override</p>
               </div>
               
-              <p className={`text-xs leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-350'}`}>
+              <p className={`text-xs leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>
                 A system administrator has reviewed and adjusted your profile settings to maintain network compliance:
               </p>
               
@@ -1267,7 +1401,7 @@ export default function App() {
           }`}>
             <button 
               onClick={() => setShowOwnProfileModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-500 text-lg p-1"
+              className="absolute top-4 right-4 text-slate-200 hover:text-slate-300 text-lg p-1"
             >
               ✕
             </button>
@@ -1295,7 +1429,7 @@ export default function App() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Display Username</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Display Username</label>
                   <input
                     type="text"
                     required
@@ -1309,7 +1443,7 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Gender</label>
+                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Gender</label>
                     <select
                       value={editGender}
                       onChange={(e) => setEditGender(e.target.value as any)}
@@ -1325,7 +1459,7 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Age</label>
+                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Age</label>
                     <input
                       type="number"
                       value={editAge}
@@ -1341,7 +1475,7 @@ export default function App() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>About Companion / Bio</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>About Companion / Bio</label>
                   <textarea
                     rows={1}
                     value={editBio}
@@ -1355,7 +1489,7 @@ export default function App() {
 
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
-                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>City</label>
+                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>City</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
                   <input
@@ -1430,7 +1564,7 @@ export default function App() {
                   {!isUserVIP && (
                     <button
                       type="button"
-                      onClick={() => { setShowOwnProfileModal(false); setScreen('plans'); }}
+                      onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
                       className="w-full py-1.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg transition text-center cursor-pointer"
                     >
                       👑 Upgrade to Royal VIP
@@ -1452,41 +1586,7 @@ export default function App() {
         </div>
       )}
 
-      {token && !me ? (
-        <div className={`min-h-screen flex flex-col items-center justify-center font-display transition duration-300 w-full max-w-full ${
-          theme === 'light' ? 'bg-slate-50 text-slate-800' : 'bg-slate-950 text-slate-100'
-        }`}>
-          <div className="relative flex flex-col items-center max-w-sm px-6 text-center">
-            <div className="relative w-20 h-20 mb-6">
-              <div className="absolute inset-0 rounded-full border-4 border-violet-500/10"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-t-violet-500 border-r-indigo-500 animate-spin"></div>
-            </div>
-            
-            <h3 className="text-xl font-black tracking-tight mb-2 uppercase">Verifying Gateway Access</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Authenticating credentials with VibeChat lounge nodes... Please wait.
-            </p>
-            
-            <button
-              onClick={() => {
-                localStorage.removeItem('vibechat_token');
-                localStorage.removeItem('vibechat_saved_token');
-                localStorage.removeItem('vibechat_saved_type');
-                setToken(null);
-                setMe(null);
-                showToast('Authentication reset successfully.');
-              }}
-              className={`mt-8 px-4 py-2 border rounded-xl text-xs font-bold uppercase transition tracking-wider cursor-pointer ${
-                theme === 'light'
-                  ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              Cancel & Start Fresh
-            </button>
-          </div>
-        </div>
-      ) : !token || !me ? (
+      {!token || !me ? (
         isAdminPortal ? (
           <AdminLoginPortal
             theme={theme}
@@ -1519,15 +1619,28 @@ export default function App() {
             }}
             onRejoin={() => {
   const tok = localStorage.getItem('vibechat_rejoin_token');
+  const snapshot = loadRejoinSnapshot();
 
   if (tok) {
+    try { localStorage.setItem('vibechat_token', tok); } catch (e) {}
+    try { localStorage.setItem('vibechat_saved_token', tok); } catch (e) {}
+
+    tokenRef.current = tok;
     setToken(tok);
+    setScreen('lobby');
+    setSidebarTab('people');
 
-    setTimeout(() => {
-      fetchLatestProfile();
-    }, 500);
+    if (snapshot) {
+      setMe(snapshot as UserProfile);
+      setDetectedGeo({
+        city: snapshot.city || detectedGeo.city,
+        state: snapshot.state || detectedGeo.state,
+        country: snapshot.country || detectedGeo.country
+      });
+    }
 
-    showToast('Welcome back! Direct transport to Initial People Lobby completed.');
+    fetchLatestProfile();
+    showToast('Welcome back! Restoring your People Lobby session.');
   }
 }}
           />
@@ -1811,7 +1924,7 @@ export default function App() {
                             }`}
                           >
                             <Smile className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">MATCHING</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">MATCHING ROOM</span>
                           </button>
 
                           <button
@@ -1823,7 +1936,7 @@ export default function App() {
                             }`}
                           >
                             <Sparkles className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">VIP</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">UPGRADE VIP</span>
                           </button>
                         </nav>
                       )}

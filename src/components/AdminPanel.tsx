@@ -4,7 +4,8 @@ import {
   VipPaymentInvoice, 
   Report, 
   PlatformConfig, 
-  SystemStats 
+  SystemStats,
+  UserType
 } from '../types';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
@@ -51,7 +52,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
   const [reports, setReports] = useState<Report[]>([]);
   const [config, setConfig] = useState<PlatformConfig | null>(null);
   const [stats, setStats] = useState<SystemStats | null>(null);
-  const [vipPlans, setVipPlans] = useState<any[]>([]);
+  const [vipPlans, setVipPlans] = useState<(any & { description?: string })[]>([]);
 
   // Filters/Searches
   const [searchUser, setSearchUser] = useState<string>('');
@@ -74,7 +75,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
     city: string;
     state: string;
     country: string;
-    type: string;
+    type: UserType;
     profilePic: string;
     isBanned: boolean;
   } | null>(null);
@@ -90,7 +91,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         city: editingUser.city || '',
         state: editingUser.state || '',
         country: editingUser.country || '',
-        type: editingUser.type || 'Registered',
+        type: editingUser.type,
         profilePic: editingUser.profilePic || '',
         isBanned: !!editingUser.isBanned,
       });
@@ -477,7 +478,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
             <span className="p-2 rounded-xl bg-violet-600/20 text-violet-400 border border-violet-500/20">🛡️</span>
             VibeChat Admin Center
           </h1>
-          <p className={`text-xs mt-1 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>Configure platform constraints, moderate members, and review billing invoices</p>
+          <p className={`text-xs mt-1 ${theme === "light" ? "text-slate-500" : "text-slate-200"}`}>Configure platform constraints, moderate members, and review billing invoices</p>
         </div>
         <div className="flex gap-2">
           {onChatAsAdmin && (
@@ -490,7 +491,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
           )}
           <button
             onClick={onBack}
-            className={`px-4 py-2 rounded-xl border transition font-medium text-xs cursor-pointer ${theme === "light" ? "bg-white border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900" : "bg-slate-800 hover:bg-slate-700 border-slate-700/50 text-stone-300 hover:text-white"}`}
+            className={`px-4 py-2 rounded-xl border transition font-medium text-xs cursor-pointer ${theme === "light" ? "bg-white border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900" : "bg-slate-800 hover:bg-slate-700 border-slate-700/50 text-slate-200 hover:text-white"}`}
           >
             Exit Control Center
           </button>
@@ -511,35 +512,35 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
         <div className={`p-5 rounded-2xl border flex flex-col justify-between ${theme === "light" ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/60 border-slate-800"}`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 font-medium text-xs font-display flex-1">Online Users</span>
+            <span className="text-slate-400 dark:text-slate-200 font-medium text-xs font-display flex-1">Online Users</span>
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
           </div>
           <p className={`text-3xl font-bold font-display ${theme === "light" ? "text-slate-900" : "text-white"}`}>{stats?.totalOnline || 0}</p>
         </div>
         <div className={`p-5 rounded-2xl border flex flex-col justify-between ${theme === "light" ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/60 border-slate-800"}`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 font-medium text-xs font-display flex-1">Total Users</span>
+            <span className="text-slate-400 dark:text-slate-200 font-medium text-xs font-display flex-1">Total Users</span>
             <Users className="w-4 h-4 text-slate-500 shrink-0" />
           </div>
           <p className={`text-3xl font-bold font-display ${theme === "light" ? "text-slate-900" : "text-white"}`}>{stats?.totalUsers || 0}</p>
         </div>
         <div className={`p-5 rounded-2xl border flex flex-col justify-between ${theme === "light" ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/60 border-slate-800"}`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 font-medium text-xs font-display flex-1">VIP Users</span>
+            <span className="text-slate-400 dark:text-slate-200 font-medium text-xs font-display flex-1">VIP Users</span>
             <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
           </div>
           <p className="text-3xl font-bold text-violet-400 font-display">{stats?.totalVIPs || 0}</p>
         </div>
         <div className={`p-5 rounded-2xl border flex flex-col justify-between ${theme === "light" ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/60 border-slate-800"}`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 font-medium text-[10px] font-display flex-1">Revenue Overview</span>
+            <span className="text-slate-400 dark:text-slate-200 font-medium text-[10px] font-display flex-1">Revenue Overview</span>
             <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
           <p className="text-3xl font-bold text-emerald-400 font-display">₹{stats?.totalRevenue || 0}</p>
         </div>
         <div className={`p-5 rounded-2xl border flex flex-col justify-between ${theme === "light" ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/60 border-slate-800"}`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 font-medium text-[10px] font-display flex-1">User Reports</span>
+            <span className="text-slate-400 dark:text-slate-200 font-medium text-[10px] font-display flex-1">User Reports</span>
             <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
           </div>
           <p className="text-3xl font-bold text-rose-400 font-display">{stats?.pendingReports || 0}</p>
@@ -547,7 +548,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         
         <div className={`p-5 rounded-2xl border flex flex-col justify-between ${theme === "light" ? "bg-white border-slate-200 shadow-sm" : "bg-slate-900/60 border-slate-800"}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 font-medium text-[10px] font-display flex-1">Live Login/Logout</span>
+            <span className="text-slate-400 dark:text-slate-200 font-medium text-[10px] font-display flex-1">Live Login/Logout</span>
             <Activity className="w-3.5 h-3.5 text-blue-400 shrink-0" />
           </div>
           <div className="h-10 w-full mt-auto">
@@ -582,7 +583,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         <button
           onClick={() => setActiveTab('users')}
           className={`pb-4 px-4 font-bold font-display text-xs uppercase tracking-wider relative transition shrink-0 cursor-pointer ${
-            activeTab === "users" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-400 hover:text-white")
+            activeTab === "users" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-200 hover:text-white")
           }`}
         >
           Users Management
@@ -591,7 +592,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         <button
           onClick={() => setActiveTab('payments')}
           className={`pb-4 px-4 font-bold font-display text-xs uppercase tracking-wider relative flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-            activeTab === "payments" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-400 hover:text-white")
+            activeTab === "payments" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-200 hover:text-white")
           }`}
         >
           Payment Reviews
@@ -603,7 +604,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         <button
           onClick={() => setActiveTab('approved_vips')}
           className={`pb-4 px-4 font-bold font-display text-xs uppercase tracking-wider relative flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-            activeTab === "approved_vips" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-400 hover:text-white")
+            activeTab === "approved_vips" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-200 hover:text-white")
           }`}
         >
           Approved VIP Access
@@ -612,7 +613,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         <button
           onClick={() => setActiveTab('reports')}
           className={`pb-4 px-4 font-bold font-display text-xs uppercase tracking-wider relative flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-            activeTab === "reports" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-400 hover:text-white")
+            activeTab === "reports" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-200 hover:text-white")
           }`}
         >
           User Reports
@@ -624,7 +625,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         <button
           onClick={() => setActiveTab('verifications')}
           className={`pb-4 px-4 font-bold font-display text-xs uppercase tracking-wider relative flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-            activeTab === "verifications" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-400 hover:text-white")
+            activeTab === "verifications" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-200 hover:text-white")
           }`}
         >
           Photo Verifications
@@ -636,7 +637,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
         <button
           onClick={() => setActiveTab('content')}
           className={`pb-4 px-4 font-bold font-display text-xs uppercase tracking-wider relative transition shrink-0 cursor-pointer ${
-            activeTab === "content" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-400 hover:text-white")
+            activeTab === "content" ? "text-violet-500" : (theme === "light" ? "text-slate-500 hover:text-slate-900" : "text-slate-200 hover:text-white")
           }`}
         >
           Platform Settings
@@ -675,7 +676,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
                   <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                     <thead>
-                      <tr className="border-b border-slate-800 text-slate-400 font-semibold font-display">
+                      <tr className="border-b border-slate-800 text-slate-200 font-semibold font-display">
                         <th className="py-3 px-4">User Details</th>
                         <th className="py-3 px-4">Location</th>
                         <th className="py-3 px-4">Role / Type</th>
@@ -703,7 +704,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                                       VERIFIED ✔
                                       {u.humanVerificationPic && (
                                         <button 
-                                          onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: String(u.humanVerificationPic) })}
+                                          onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: u.humanVerificationPic || '' })}
                                           className="hover:scale-110 transition cursor-pointer text-[12px] p-0 border-none bg-transparent"
                                           title="View Verification Photo"
                                         >
@@ -717,7 +718,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                                       PENDING
                                       {u.humanVerificationPic && (
                                         <button 
-                                          onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: String(u.humanVerificationPic) })}
+                                          onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: u.humanVerificationPic || '' })}
                                           className="hover:scale-110 transition cursor-pointer text-[12px] p-0 border-none bg-transparent"
                                           title="Verify Photo"
                                         >
@@ -730,14 +731,14 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                                 <span className="text-slate-500 block text-[10px]">{u.email || 'Guest user session'}</span>
                               </div>
                             </td>
-                            <td className="py-4 px-4 text-slate-300">
+                            <td className="py-4 px-4 text-slate-200">
                               {u.city}, {u.state}, {u.country}
                             </td>
                             <td className="py-4 px-4">
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider ${
                                 u.type === 'Royal VIP' 
                                   ? 'bg-violet-500/10 border border-violet-500/20 text-violet-400 glow-purple'
-                                  : 'bg-slate-800 text-slate-400 border border-slate-700/50'
+                                  : 'bg-slate-800 text-slate-200 border border-slate-700/50'
                               }`}>
                                 {u.type}
                               </span>
@@ -776,7 +777,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                               {u.type === 'Moderator' ? (
                                 <button
                                   onClick={() => handleDemoteMod(u.id)}
-                                  className="px-2.5 py-1 text-[10px] font-semibold border bg-slate-500/15 border-slate-500/20 text-slate-400 hover:bg-slate-500/20 rounded-lg transition cursor-pointer"
+                                  className="px-2.5 py-1 text-[10px] font-semibold border bg-slate-500/15 border-slate-500/20 text-slate-200 hover:bg-slate-500/20 rounded-lg transition cursor-pointer"
                                 >
                                   Demote Mod
                                 </button>
@@ -852,7 +853,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                             </span>
                           </div>
 
-                          <div className={`space-y-1.5 text-[11px] mb-4 p-3 rounded-xl border ${theme === "light" ? "bg-white border-slate-200 text-slate-500" : "bg-slate-900/40 border-slate-800/40 text-slate-400"}`}>
+                          <div className={`space-y-1.5 text-[11px] mb-4 p-3 rounded-xl border ${theme === "light" ? "bg-white border-slate-200 text-slate-500" : "bg-slate-900/40 border-slate-800/40 text-slate-200"}`}>
                             <div>Plan Selected: <span className={`font-semibold ${theme === "light" ? "text-slate-900" : "text-white"}`}>{p.planName}</span></div>
                             <div>Price INR: <span className={`font-semibold ${theme === "light" ? "text-slate-900" : "text-white"}`}>₹{p.price}</span></div>
                             <div>Uploaded At: <span className="text-slate-500">{formattedDate}</span></div>
@@ -924,7 +925,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                             </span>
                           </div>
 
-                          <div className={`space-y-1.5 text-[11px] mb-4 p-3 rounded-xl border ${theme === "light" ? "bg-white border-slate-200 text-slate-500" : "bg-slate-900/40 border-slate-800/40 text-slate-400"}`}>
+                          <div className={`space-y-1.5 text-[11px] mb-4 p-3 rounded-xl border ${theme === "light" ? "bg-white border-slate-200 text-slate-500" : "bg-slate-900/40 border-slate-800/40 text-slate-200"}`}>
                             <div>Plan Selected: <span className={`font-semibold ${theme === "light" ? "text-slate-900" : "text-white"}`}>{p.planName}</span></div>
                             <div>Price INR: <span className={`font-semibold ${theme === "light" ? "text-slate-900" : "text-white"}`}>₹{p.price}</span></div>
                             <div>Uploaded At: <span className="text-slate-500">{formattedDate}</span></div>
@@ -961,7 +962,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
                   <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                     <thead>
-                      <tr className="border-b border-slate-800 text-slate-400 font-semibold font-display">
+                      <tr className="border-b border-slate-800 text-slate-200 font-semibold font-display">
                         <th className="py-3 px-4">Reporter</th>
                         <th className="py-3 px-4">Reported Stranger User</th>
                         <th className="py-3 px-4">Reason Filed</th>
@@ -973,9 +974,9 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                     <tbody className="divide-y divide-slate-800/40">
                       {reports.map((r) => (
                         <tr key={r.id} className={`${theme === "light" ? "hover:bg-slate-50" : "hover:bg-slate-950/20"}`}>
-                          <td className="py-4 px-4 font-semibold text-slate-300">{r.reporterName} ({r.reporterId.substring(0, 8)})</td>
+                          <td className="py-4 px-4 font-semibold text-slate-200">{r.reporterName} ({r.reporterId.substring(0, 8)})</td>
                           <td className="py-4 px-4 font-bold text-rose-300">{r.reportedName} ({r.reportedId.substring(0, 8)})</td>
-                          <td className="py-4 px-4 max-w-xs truncate text-slate-400" title={r.reason}>{r.reason}</td>
+                          <td className="py-4 px-4 max-w-xs truncate text-slate-400 dark:text-slate-200" title={r.reason}>{r.reason}</td>
                           <td className="py-4 px-4 text-slate-500">{new Date(r.timestamp).toLocaleString()}</td>
                           <td className="py-4 px-4 text-center">
                             <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
@@ -1017,20 +1018,20 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
               <h2 className={`text-lg font-bold font-display ${theme === "light" ? "text-slate-900" : "text-white"}`}>Photo Verifications Queue</h2>
               {users.filter(u => u.photoVerificationPending).length === 0 ? (
                 <div className={`p-8 text-center rounded-2xl border border-dashed ${theme === "light" ? "bg-slate-50 border-slate-200" : "bg-slate-900/30 border-slate-800"}`}>
-                  <p className={`text-xs font-semibold ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>No pending photo verifications to review.</p>
+                  <p className={`text-xs font-semibold ${theme === "light" ? "text-slate-500" : "text-slate-200"}`}>No pending photo verifications to review.</p>
                 </div>
               ) : (
                 <div className={`rounded-2xl border overflow-hidden shadow-sm ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className={`${theme === "light" ? "bg-slate-50 text-slate-500" : "bg-slate-950 text-slate-400"} text-[10px] uppercase font-bold tracking-wider`}>
+                      <tr className={`${theme === "light" ? "bg-slate-50 text-slate-500" : "bg-slate-950 text-slate-200"} text-[10px] uppercase font-bold tracking-wider`}>
                         <th className="py-3 px-4 w-1/4">User</th>
                         <th className="py-3 px-4 w-1/4">Registration Time</th>
                         <th className="py-3 px-4 w-1/4">Time Elapsed</th>
                         <th className="py-3 px-4 w-1/4 text-right pr-6">Action</th>
                       </tr>
                     </thead>
-                    <tbody className={`divide-y text-xs ${theme === "light" ? "divide-slate-100 text-slate-700" : "divide-slate-800 text-slate-300"}`}>
+                    <tbody className={`divide-y text-xs ${theme === "light" ? "divide-slate-100 text-slate-700" : "divide-slate-800 text-slate-200"}`}>
                       {users.filter(u => u.photoVerificationPending).map(u => (
                         <tr key={u.id} className={`transition ${theme === "light" ? "hover:bg-slate-50" : "hover:bg-slate-800/50"}`}>
                           <td className="py-3 px-4">
@@ -1043,7 +1044,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                           </td>
                           <td className="py-3 px-4 text-right pr-6">
                             <button
-                              onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: String(u.humanVerificationPic) })}
+                              onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: u.humanVerificationPic || '' })}
                               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs transition font-semibold cursor-pointer tracking-wide"
                             >
                               Review Photo
@@ -1065,7 +1066,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                  <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Website Brand Name</label>
+                  <label className="block text-slate-400 dark:text-slate-200 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Website Brand Name</label>
                   <input
                     type="text"
                     value={config.homepageTitle}
@@ -1074,7 +1075,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Tagline</label>
+                  <label className="block text-slate-400 dark:text-slate-200 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Tagline</label>
                   <input
                     type="text"
                     value={config.homepageTagline}
@@ -1085,7 +1086,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
               </div>
 
               <div>
-                <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Global Announcement Marquee</label>
+                <label className="block text-slate-400 dark:text-slate-200 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Global Announcement Marquee</label>
                 <textarea
                   value={config.announcement}
                   onChange={(e) => setConfig({ ...config, announcement: e.target.value })}
@@ -1095,7 +1096,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
               </div>
 
               <div className={`p-5 rounded-2xl border ${theme === "light" ? "bg-slate-50 border-slate-200" : "bg-slate-900/40 border-slate-800"}`}>
-                <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Community Rules (One per line)</label>
+                <label className="block text-slate-400 dark:text-slate-200 text-xs font-semibold mb-2 uppercase tracking-wide font-display">Community Rules (One per line)</label>
                 <textarea
                   value={config.communityRules?.join('\n') || ''}
                   onChange={(e) => setConfig({ ...config, communityRules: e.target.value.split('\n').filter(Boolean) })}
@@ -1125,7 +1126,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                   <div className="space-y-3">
-                    <label className="block text-slate-400 text-xs font-semibold mb-1 uppercase tracking-wide font-display">Upload New UPI QR Code</label>
+                    <label className="block text-slate-400 dark:text-slate-200 text-xs font-semibold mb-1 uppercase tracking-wide font-display">Upload New UPI QR Code</label>
                     <div className={`relative border border-dashed rounded-xl p-6 text-center cursor-pointer group transition ${theme === "light" ? "border-slate-300 hover:border-slate-400 bg-slate-50/50" : "border-slate-800 hover:border-slate-700 bg-slate-950"}`}>
                       <input
                         type="file"
@@ -1134,7 +1135,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                       <Upload className="w-6 h-6 mx-auto text-slate-500 group-hover:text-violet-500 mb-2 transition" />
-                      <span className="text-[11px] font-semibold text-slate-400 block">Replace QR Vector</span>
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-200 block">Replace QR Vector</span>
                     </div>
                   </div>
 
@@ -1166,7 +1167,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
               <h3 className="text-md font-bold font-display text-amber-400 mb-1 flex items-center gap-2">
                 👑 VIP Pricing Plans Manager
               </h3>
-              <p className="text-[11px] text-slate-400 mb-6">
+              <p className="text-[11px] text-slate-400 dark:text-slate-200 mb-6">
                 Directly calibrate coin/INR price levels, duration periods, and benefits shown to customers.
               </p>
 
@@ -1263,7 +1264,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                       }
                     ]);
                   }}
-                  className={`px-5 py-2.5 font-bold font-display rounded-xl text-[10px] tracking-wider uppercase transition cursor-pointer ${theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-700" : "bg-slate-800 hover:bg-slate-700 text-slate-300"}`}
+                  className={`px-5 py-2.5 font-bold font-display rounded-xl text-[10px] tracking-wider uppercase transition cursor-pointer ${theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-700" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`}
                 >
                   + Add VIP Plan
                 </button>
@@ -1309,7 +1310,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
             <button
                onClick={() => setInspectingVerificationPhoto(null)}
               className={`mt-2 w-full py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition cursor-pointer ${
-                theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
               }`}
             >
               Cancel
@@ -1328,7 +1329,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
             <form onSubmit={handleSaveUserFromAdmin} className="space-y-4 font-display">
               <div className="text-center">
                 <h3 className={`text-lg font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Admin Profile Override</h3>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Control & Edit Any User Properties</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-200 uppercase tracking-widest mt-0.5">Control & Edit Any User Properties</p>
               </div>
 
               {/* Avatar Section */}
@@ -1349,7 +1350,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
               {/* Fields grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2.5">
                 <div>
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Display Username</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Display Username</label>
                   <input
                     type="text"
                     required
@@ -1363,7 +1364,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Gender</label>
+                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Gender</label>
                     <select
                       value={editForm.gender}
                       onChange={(e) => setEditForm({ ...editForm, gender: e.target.value as any })}
@@ -1377,7 +1378,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                     </select>
                   </div>
                   <div>
-                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Age</label>
+                    <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400 dark:text-slate-200'}`}>Age</label>
                     <input
                       type="number"
                       value={editForm.age}
@@ -1390,7 +1391,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Bio</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400 dark:text-slate-200'}`}>Bio</label>
                   <textarea
                     rows={2}
                     value={editForm.bio}
@@ -1402,7 +1403,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 </div>
 
                 <div>
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>City</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400 dark:text-slate-200'}`}>City</label>
                   <input
                     type="text"
                     value={editForm.city}
@@ -1414,7 +1415,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 </div>
 
                 <div>
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>State</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400 dark:text-slate-200'}`}>State</label>
                   <input
                     type="text"
                     value={editForm.state}
@@ -1426,7 +1427,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 </div>
 
                 <div>
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Country</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400 dark:text-slate-200'}`}>Country</label>
                   <input
                     type="text"
                     value={editForm.country}
@@ -1438,10 +1439,10 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 </div>
 
                 <div>
-                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Account Type/Role</label>
+                  <label className={`block text-[9px] uppercase font-extrabold tracking-wider mb-1 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400 dark:text-slate-200'}`}>Account Type/Role</label>
                   <select
                     value={editForm.type}
-                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value as UserType })}
                     className={`w-full text-xs p-2.5 rounded-xl outline-none border transition ${
                       theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500'
                     }`}
@@ -1456,7 +1457,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 <div className="sm:col-span-2 flex items-center justify-between p-3 rounded-xl border border-rose-500/10 bg-rose-500/5 mt-1 leading-none">
                   <div className="leading-tight">
                     <span className="block text-xs font-bold text-rose-500">Ban Account</span>
-                    <span className="text-[10px] text-slate-400">Restricts user lobby and messaging rights instantly</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-200">Restricts user lobby and messaging rights instantly</span>
                   </div>
                   <input
                     type="checkbox"
@@ -1479,7 +1480,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                   type="button"
                   onClick={() => setEditingUser(null)}
                   className={`flex-1 py-2.5 font-bold rounded-xl text-xs uppercase tracking-wider transition border cursor-pointer ${
-                    theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300'
+                    theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-200'
                   }`}
                 >
                   Cancel

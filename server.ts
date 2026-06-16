@@ -1013,7 +1013,10 @@ APP.get('/api/messages/:peerId', authenticateToken, (req: any, res) => {
   }
 
   const messages = dbManager.getMessagesBetween(senderId, recipientId);
-  dbManager.markMessagesRead(recipientId, senderId);
+  const readIds = dbManager.markMessagesRead(recipientId, senderId);
+  if (readIds.length > 0) {
+    sendWSMessage(recipientId, 'chat:read', { messageIds: readIds });
+  }
   res.json(messages);
 });
 
@@ -1515,8 +1518,8 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
 
       // CHAT MESSAGES
       if (event === 'chat:message') {
-        const { recipientId, content, mediaUrl, type } = data;
-        const msgId = `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const { recipientId, content, mediaUrl, type, messageId } = data;
+        const msgId = messageId || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
         
         // Spam mitigation safety layer (rate limit count of chats etc inside memory if necessary, done at client)
         if (!recipientId || (!content && !mediaUrl)) return;

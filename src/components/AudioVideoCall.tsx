@@ -358,6 +358,7 @@ export default function AudioVideoCall({
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
+                style={{ transform: 'none' }}
                 className="w-full h-full object-cover"
               />
             
@@ -375,6 +376,7 @@ export default function AudioVideoCall({
                   autoPlay
                   playsInline
                   muted
+                  style={{ transform: 'none' }}
                   className="w-full h-full object-cover"
                 />
               <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-slate-950/60 rounded text-[9px] text-white">

@@ -44,6 +44,7 @@ export interface ChatMessage {
   type?: 'text' | 'image' | 'voice' | 'video';
   timestamp: number;
   read: boolean;
+  deliveryStatus?: 'sent' | 'delivered' | 'read';
 }
 
 export interface RecentChat {
@@ -62,6 +63,8 @@ export interface RecentChat {
   peerAge?: number;
   peerCreatedAt?: string;
   peerLastSeenAt?: string;
+  peerBio?: string;
+  peerDescription?: string;
 }
 
 export interface Report {

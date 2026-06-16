@@ -287,13 +287,18 @@ class DatabaseManager {
     return recent;
   }
 
-  public markMessagesRead(senderId: string, recipientId: string) {
+  public markMessagesRead(senderId: string, recipientId: string): string[] {
+    const updatedIds: string[] = [];
     this.db.messages.forEach(m => {
-      if (m.senderId === senderId && m.recipientId === recipientId) {
+      if (m.senderId === senderId && m.recipientId === recipientId && !m.read) {
         m.read = true;
+        updatedIds.push(m.id);
       }
     });
-    this.save();
+    if (updatedIds.length > 0) {
+      this.save();
+    }
+    return updatedIds;
   }
 
   // REPORTS

@@ -207,6 +207,34 @@ export default function ChatInterface({
   const [inspectedFullDetails, setInspectedFullDetails] = useState<any | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 
+  const renderMessageDeliveryIndicator = (msg: ChatMessage) => {
+    if (msg.senderId !== me.id) return null;
+    const status = msg.deliveryStatus || (msg.read ? 'read' : 'sent');
+    const iconClass = 'w-4 h-4';
+
+    if (status === 'read') {
+      return (
+        <span className="text-sky-400" title="Read">
+          <CheckCheck className={iconClass} />
+        </span>
+      );
+    }
+
+    if (status === 'delivered') {
+      return (
+        <span className="text-slate-200" title="Delivered">
+          <CheckCheck className={iconClass} />
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-slate-200" title="Sent">
+        <Check className={iconClass} />
+      </span>
+    );
+  };
+
   // Admin Override Editor Handlers
   const startAdminEditing = () => {
     if (!inspectedPeer) return;
@@ -497,11 +525,13 @@ export default function ChatInterface({
 
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
 
-  // Fetch initial side views data
+  // Fetch initial side views data and refresh when switching between People and Chat tabs
   useEffect(() => {
-    fetchSideData();
+    if (sidebarTab === 'people' || sidebarTab === 'chat') {
+      fetchSideData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatState]);
+  }, [chatState, sidebarTab]);
 
   useEffect(() => {
     const handleHardwareBack = (e: Event) => {
@@ -613,8 +643,29 @@ export default function ChatInterface({
           }
         } else if (event === 'chat:delivered') {
           const deliveredMsg: ChatMessage = data;
-          if (activePartner && activePartner.id === deliveredMsg.recipientId) {
-            setHistoryMessages(prev => [...prev, deliveredMsg]);
+          setHistoryMessages(prev => prev.map(m => {
+            if (m.id === deliveredMsg.id) {
+              return {
+                ...m,
+                deliveryStatus: 'delivered',
+                read: m.read || deliveredMsg.read
+              };
+            }
+            return m;
+          }));
+        } else if (event === 'chat:read') {
+          const { messageIds } = data;
+          if (Array.isArray(messageIds) && messageIds.length > 0) {
+            setHistoryMessages(prev => prev.map(m => {
+              if (messageIds.includes(m.id)) {
+                return {
+                  ...m,
+                  deliveryStatus: 'read',
+                  read: true
+                };
+              }
+              return m;
+            }));
           }
         } else if (event === 'chat:typing') {
           if (activePartner && activePartner.id === data.senderId) {
@@ -679,8 +730,12 @@ export default function ChatInterface({
       const res = await fetch(`/api/messages/${peer.id}`, { headers });
       
       if (res.ok) {
-        const msgs = await res.json();
-        setHistoryMessages(msgs);
+        const msgs: ChatMessage[] = await res.json();
+        const normalized = msgs.map(msg => ({
+          ...msg,
+          deliveryStatus: (msg.senderId === me.id ? (msg.read ? 'read' : 'delivered') : undefined) as 'delivered' | 'read' | undefined
+        }));
+        setHistoryMessages(normalized);
         setActivePartner(peer as any);
         setChatState('direct');
         setSystemAlert(null);
@@ -752,13 +807,26 @@ export default function ChatInterface({
       finalContent = `↩️ Replying to: "${parentClipText}"\n\n${finalContent}`;
     }
 
+    const outgoingMessageId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     ws.send(JSON.stringify({
       event: 'chat:message',
       data: {
+        messageId: outgoingMessageId,
         recipientId: activePartner.id,
         content: finalContent
       }
     }));
+
+    setHistoryMessages(prev => [...prev, {
+      id: outgoingMessageId,
+      senderId: me.id,
+      recipientId: activePartner.id,
+      content: finalContent,
+      timestamp: Date.now(),
+      read: false,
+      deliveryStatus: 'sent'
+    }] as any);
 
     setMessageText('');
     setReplyingTo(null);
@@ -804,22 +872,24 @@ export default function ChatInterface({
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>, mediaType: 'image' | 'voice' | 'video') => {
     const file = e.target.files?.[0];
     if (!file || !activePartner?.id || !ws) return;
+    const outgoingMessageId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
       ws.send(JSON.stringify({ 
         event: 'chat:message',
-        data: { recipientId: activePartner.id, content: '', mediaUrl: base64, type: mediaType } 
+        data: { messageId: outgoingMessageId, recipientId: activePartner.id, content: '', mediaUrl: base64, type: mediaType } 
       }));
       setHistoryMessages(prev => [...prev, {
-        id: `msg-${Date.now()}`,
+        id: outgoingMessageId,
         senderId: me.id,
         recipientId: activePartner.id!,
         content: '',
         mediaUrl: base64,
         type: mediaType,
         timestamp: Date.now(),
-        read: true
+        read: false,
+        deliveryStatus: 'sent'
       }]);
     };
     reader.readAsDataURL(file);
@@ -891,23 +961,25 @@ export default function ChatInterface({
   const sendRecordedVoiceMessage = () => {
     const blobToSend = audioBlob;
     if (!blobToSend || !activePartner?.id || !ws) return;
+    const outgoingMessageId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
       ws.send(JSON.stringify({ 
         event: 'chat:message',
-        data: { recipientId: activePartner.id, content: '', mediaUrl: base64, type: 'voice' } 
+        data: { messageId: outgoingMessageId, recipientId: activePartner.id, content: '', mediaUrl: base64, type: 'voice' } 
       }));
       setHistoryMessages(prev => [...prev, {
-        id: `msg-${Date.now()}`,
+        id: outgoingMessageId,
         senderId: me.id,
         recipientId: activePartner.id!,
         content: '',
         mediaUrl: base64,
         type: 'voice',
         timestamp: Date.now(),
-        read: true
+        read: false,
+        deliveryStatus: 'sent'
       }]);
     };
     reader.readAsDataURL(blobToSend);
@@ -1036,12 +1108,13 @@ export default function ChatInterface({
         city: r.peerCity || '',
         state: r.peerState || '',
         country: r.peerCountry || '',
+        bio: r.peerBio || r.peerDescription || '',
         online: false,
         lastSeenAt: r.peerLastSeenAt
       });
     });
     onlineUsers.forEach(ou => {
-      allKnownUsers.set(ou.id, { ...ou, online: true });
+      allKnownUsers.set(ou.id, { ...ou, online: true, bio: ou.bio || ou.description || '' });
     });
 
     // Offline users only appear in search
@@ -1074,8 +1147,8 @@ export default function ChatInterface({
       });
   }, [recents, onlineUsers, searchQuery, me.id, me.blockedUsers, backendSearchResults]);
 
-  const showLeftSidebar = sidebarTab === 'people' || (sidebarTab === 'chat' && !activePartner);
-  const showMainChatPane = sidebarTab === 'lounge' || (sidebarTab === 'chat' && activePartner != null);
+  const showLeftSidebar = sidebarTab === 'people' || sidebarTab === 'lounge' || (sidebarTab === 'chat' && !activePartner);
+  const showMainChatPane = sidebarTab === 'chat' && activePartner != null;
 
   return (
     <div className="flex flex-1 min-h-0 w-full bg-transparent">
@@ -1114,7 +1187,7 @@ export default function ChatInterface({
                     <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1 rounded font-extrabold uppercase shrink-0">🛡️ MODERATOR</span>
                   )}
                   {me.type === 'Admin' && (
-                    <span className="text-[8px] bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20 px-1 rounded font-extrabold uppercase shrink-0" title="Platform Administrator">⚙️ ADMIN</span>
+                    <span className="text-[8px] bg-slate-500/10 text-slate-500 dark:text-slate-200 border border-slate-500/20 px-1 rounded font-extrabold uppercase shrink-0" title="Platform Administrator">⚙️ ADMIN</span>
                   )}
                 </div>
               </div>
@@ -1131,7 +1204,7 @@ export default function ChatInterface({
           {/* Search Box: filters users on current lists */}
           <div className={`p-3 border-b ${theme === 'light' ? 'border-slate-200 bg-slate-50/30' : 'border-slate-800/60 bg-slate-950/20'}`}>
             <div className="relative">
-              <Search className={`absolute left-3 top-2.5 w-3.5 h-3.5 ${theme === 'light' ? 'text-slate-400' : 'text-slate-500'}`} />
+              <Search className={`absolute left-3 top-2.5 w-3.5 h-3.5 ${theme === 'light' ? 'text-slate-200' : 'text-slate-200'}`} />
               <input
                 type="text"
                 placeholder={
@@ -1156,7 +1229,7 @@ export default function ChatInterface({
             {sidebarTab === 'chat' && (
               <div className="p-3 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h3 className={`text-[9px] uppercase font-bold tracking-wider font-display shrink-0 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <h3 className={`text-[9px] uppercase font-bold tracking-wider font-display shrink-0 ${theme === 'light' ? 'text-slate-500' : 'text-slate-200'}`}>
                     Recent Chat Conversations
                   </h3>
                   <div className="flex gap-1.5 flex-wrap">
@@ -1168,7 +1241,7 @@ export default function ChatInterface({
                 </div>
                 
                 {filteredRecents.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-500 italic">No recent chats matching filter.</div>
+                  <div className="py-8 text-center text-xs text-slate-200 italic">No recent chats matching filter.</div>
                 ) : (
                   <div className="space-y-3">
                     {filteredRecents.map((rc) => {
@@ -1185,7 +1258,7 @@ export default function ChatInterface({
                                   : 'bg-violet-950/20 border-violet-500 text-white pl-5')
                               : (theme === 'light'
                                   ? 'border-transparent hover:bg-slate-100 text-slate-700 font-medium'
-                                  : 'border-transparent hover:bg-slate-900/40 text-slate-300')
+                                  : 'border-transparent hover:bg-slate-900/40 text-slate-200')
                           }`}
                         >
                           <button
@@ -1231,7 +1304,7 @@ export default function ChatInterface({
                                 </span>
                                 {isMsgVIP && <span title="Royal VIP Creator" className="text-[13px] text-amber-400 select-none">👑</span>}
                                 {rc.peerType === 'Moderator' && <span title="Moderator Badge" className="text-[13px] text-indigo-400 select-none">🛡️</span>}
-                                {rc.peerType === 'Admin' && <span title="Platform Administrator" className="text-[13px] text-slate-500 dark:text-slate-400 select-none">⚙️</span>}
+                                {rc.peerType === 'Admin' && <span title="Platform Administrator" className="text-[13px] text-slate-500 dark:text-slate-200 select-none">⚙️</span>}
                                 {rc.peerType === 'Registered' && <span title="Camera Verified" className="text-[13px] select-none">📸</span>}
                                 {rc.unreadCount > 0 && (
                                   <span className="relative flex h-3 w-3 shrink-0 ml-1">
@@ -1240,7 +1313,7 @@ export default function ChatInterface({
                                   </span>
                                 )}
                               </div>
-                              <span className="text-sm text-slate-500 truncate block font-medium max-w-[220px]">{rc.lastMessage}</span>
+<span className="text-sm text-slate-200 truncate block font-medium max-w-[220px]">{rc.lastMessage}</span>
                             </div>
                           </button>
 
@@ -1302,7 +1375,7 @@ export default function ChatInterface({
                 {/* Active Online lists */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className={`text-[9px] uppercase font-bold tracking-wider font-display ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <h3 className={`text-[9px] uppercase font-bold tracking-wider font-display ${theme === 'light' ? 'text-slate-500' : 'text-slate-200'}`}>
                       Platform Directory
                     </h3>
                     <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 flex items-center gap-1 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
@@ -1312,7 +1385,7 @@ export default function ChatInterface({
                   </div>
 
                   {filteredOnline.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-slate-500 italic">No users are currently online.</div>
+                    <div className="py-8 text-center text-xs text-slate-200 italic">No users are currently online.</div>
                   ) : (
                     <div className="space-y-3">
                       {filteredOnline.map((ou) => {
@@ -1342,13 +1415,18 @@ export default function ChatInterface({
                               <div className="min-w-0 flex flex-col justify-center gap-1">
                                 <span className={`text-base font-bold flex items-center gap-1.5 ${
                                   theme === 'light' ? 'text-slate-800' : 'text-stone-100'
-                                } ${ou.type === 'Royal VIP' ? 'text-violet-400' : ''} ${ou.type === 'Moderator' ? 'text-indigo-400' : ''} ${ou.type === 'Admin' ? 'text-slate-500 dark:text-slate-400' : ''}`}>
+                                } ${ou.type === 'Royal VIP' ? 'text-violet-400' : ''} ${ou.type === 'Moderator' ? 'text-indigo-400' : ''} ${ou.type === 'Admin' ? 'text-slate-500 dark:text-slate-200' : ''}`}>
                                   <span className="truncate max-w-[200px] block">{ou.type === 'Admin' ? 'VibeChat ADMIN' : ou.username}</span>
                                   {ou.type === 'Royal VIP' && <span title="Royal VIP" className="text-[13px] text-amber-400 select-none">👑</span>}
                                   {ou.type === 'Moderator' && <span title="Moderator Badge" className="text-[13px] select-none">🛡️</span>}
-                                  {ou.type === 'Admin' && <span title="Platform Administrator" className="text-[13px] text-slate-500 dark:text-slate-400 select-none">⚙️</span>}
+                                  {ou.type === 'Admin' && <span title="Platform Administrator" className="text-[13px] text-slate-500 dark:text-slate-200 select-none">⚙️</span>}
                                   {ou.type === 'Registered' && <span title="Camera Verified" className="text-[13px] select-none">📸</span>}
                                 </span>
+                                {ou.bio && (
+                                  <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-200 max-w-full break-words whitespace-pre-wrap">
+                                    {ou.bio}
+                                  </p>
+                                )}
                               </div>
                             </button>
                           </div>
@@ -1394,7 +1472,7 @@ export default function ChatInterface({
                 <button
                   onClick={handleExitChat}
                   className={`p-2 -ml-2 rounded-xl transition cursor-pointer ${
-                    theme === 'light' ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-slate-800 text-slate-400'
+                    theme === 'light' ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-slate-800 text-slate-200'
                   }`}
                 >
                   <ChevronLeft className="w-6 h-6" />
@@ -1415,7 +1493,7 @@ export default function ChatInterface({
                       {activePartner?.type === 'Admin' ? 'VibeChat ADMIN' : activePartner?.username}
                       {activePartner?.type === 'Royal VIP' && <span className="text-amber-400" title="Royal VIP">👑</span>}
                       {activePartner?.type === 'Moderator' && <span className="text-indigo-400" title="Moderator Badge">🛡️</span>}
-                      {activePartner?.type === 'Admin' && <span className="text-slate-500 dark:text-slate-400" title="Platform Administrator">⚙️</span>}
+                      {activePartner?.type === 'Admin' && <span className="text-slate-500 dark:text-slate-200" title="Platform Administrator">⚙️</span>}
                       {activePartner?.type === 'Registered' && <span className="opacity-80" title="Camera Verified">📸</span>}
                     </span>
                   </div>
@@ -1476,7 +1554,7 @@ export default function ChatInterface({
                     className={`p-2 border rounded-xl transition cursor-pointer ${
                       theme === 'light'
                         ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                        : 'bg-slate-900/60 hover:bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        : 'bg-slate-900/60 hover:bg-slate-900 border-slate-800 text-slate-200 hover:text-white'
                     }`}
                     title="Initiate Audio Call"
                   >
@@ -1487,7 +1565,7 @@ export default function ChatInterface({
                     className={`p-2 border rounded-xl transition cursor-pointer ${
                       theme === 'light'
                         ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                        : 'bg-slate-900/60 hover:bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        : 'bg-slate-900/60 hover:bg-slate-900 border-slate-800 text-slate-200 hover:text-white'
                     }`}
                     title="Initiate HD Video Call"
                   >
@@ -1497,7 +1575,7 @@ export default function ChatInterface({
                   <div className="relative z-[95]" ref={dropdownRef}>
                     <button
                       onClick={handleToggleOptionsDropdown}
-                      className={`p-2 rounded-xl transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500 hover:text-slate-800" : "hover:bg-slate-900 text-slate-400 hover:text-white"}`}
+                      className={`p-2 rounded-xl transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500 hover:text-slate-800" : "hover:bg-slate-900 text-slate-200 hover:text-white"}`}
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
@@ -1524,7 +1602,7 @@ export default function ChatInterface({
                             <Flag className="w-4 h-4 text-amber-500" /> File Complaint
                           </button>
                           
-                          {me.blockedUsers?.includes(activePartner.id) ? (
+                          {activePartner?.id && me.blockedUsers?.includes(activePartner.id) ? (
                             <button
                               onClick={() => { handleUnblockUser(); closeDropdownWithHistory(); }}
                               className={`w-full text-left px-4 py-2.5 flex items-center gap-3 cursor-pointer transition ${theme === "light" ? "hover:bg-slate-100 text-sky-600 hover:text-sky-800" : "hover:bg-slate-800 text-sky-400 hover:text-sky-100"}`}
@@ -1553,7 +1631,7 @@ export default function ChatInterface({
             <div className="fixed inset-0 bg-slate-950/80 z-[300] flex items-center justify-center p-6">
               <div className={`p-6 rounded-2xl w-full max-w-sm border ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
                 <h4 className="font-bold font-display text-white text-base mb-2">Are you sure you want to quit?</h4>
-                <p className="text-xs text-slate-400 mb-6 leading-relaxed">You are about to exit the application.</p>
+                <p className="text-xs text-slate-200 mb-6 leading-relaxed">You are about to exit the application.</p>
                 
                 <div className="flex gap-3">
                   <button
@@ -1578,7 +1656,7 @@ export default function ChatInterface({
             <div className="absolute inset-0 bg-slate-950/80 z-30 flex items-center justify-center p-6">
               <div className={`p-6 rounded-2xl w-full max-w-sm border ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
                 <h4 className="font-bold font-display text-white text-base mb-2">File Abuse Complaint</h4>
-                <p className="text-xs text-slate-400 mb-4 leading-relaxed">Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
+                <p className="text-xs text-slate-200 mb-4 leading-relaxed">Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
                 
                 <form onSubmit={handleReportUser} className="space-y-4">
                   <textarea
@@ -1599,7 +1677,7 @@ export default function ChatInterface({
                     <button
                       type="button"
                       onClick={() => { setShowReportDialog(false); setReportReason(''); }}
-                      className={`w-1/2 py-2 rounded-lg transition font-medium text-xs ${theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-slate-800 hover:bg-slate-700 text-slate-400"}`}
+                      className={`w-1/2 py-2 rounded-lg transition font-medium text-xs ${theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`}
                     >
                       Cancel
                     </button>
@@ -1610,12 +1688,12 @@ export default function ChatInterface({
           )}
 
           {/* CENTRAL CHAT LOG MEMORY SCREEN */}
-          <div className={`flex-1 min-h-0 p-4 md:p-6 lg:p-8 overflow-y-auto space-y-4 md:space-y-6 transition duration-300 relative ${
+          <div className={`flex-1 min-h-0 relative overflow-hidden rounded-2xl transition duration-300 ${
             theme === 'light' ? 'bg-slate-50/50' : 'bg-slate-900/10'
           }`}>
             {wallpaper && (chatState === 'matched' || chatState === 'direct') && activePartner && (
               <div
-                className="absolute inset-0 z-0 w-full h-full rounded-2xl"
+                className="absolute inset-0 z-0 w-full h-full"
                 style={{
                   backgroundImage: `url(${wallpaper})`,
                   backgroundSize: 'cover',
@@ -1625,7 +1703,7 @@ export default function ChatInterface({
                 }}
               />
             )}
-            <div className="relative z-10 space-y-4 md:space-y-6 min-h-full flex flex-col pb-6">
+            <div className="relative z-10 h-full overflow-y-auto p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
               {chatState === 'idle' ? (
               <div className="py-12 text-center space-y-6 max-w-md mx-auto my-auto flex flex-col justify-center items-center animate-fade-in text-left">
                 <div className="relative">
@@ -1637,7 +1715,7 @@ export default function ChatInterface({
                 </div>
                 <div className="text-center">
                   <h4 className={`font-bold text-base mb-2 font-display ${theme === 'light' ? 'text-slate-800' : 'text-white'}`}>Welcome to VibeChat Space</h4>
-                  <p className={`text-xs leading-relaxed ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <p className={`text-xs leading-relaxed ${theme === 'light' ? 'text-slate-500' : 'text-slate-200'}`}>
                     Connect instantly with online users around the world. No unnecessary popups, 100% fast matchmaking, secure socket line connections.
                   </p>
                 </div>
@@ -1755,7 +1833,7 @@ export default function ChatInterface({
 
                 <div className="space-y-2">
                   <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Searching Stranger Matches...</h4>
-                  <p className="text-[11px] text-slate-400 animate-pulse">Scanning live socket pool. Connecting you immediately.</p>
+                  <p className="text-[11px] text-slate-200 animate-pulse">Scanning live socket pool. Connecting you immediately.</p>
                 </div>
 
                 <button
@@ -1818,7 +1896,7 @@ export default function ChatInterface({
                         <div className={`mb-2.5 p-2 px-3 border-l-2 text-xs rounded-xl font-medium flex flex-col gap-0.5 ${
                           isSelf 
                             ? 'bg-white/10 border-white/60 text-white/95' 
-                            : (theme === 'light' ? 'bg-slate-50 border-violet-500 text-slate-600' : 'bg-slate-900 border-violet-500 text-stone-300')
+                            : (theme === 'light' ? 'bg-slate-50 border-violet-500 text-slate-600' : 'bg-slate-900 border-violet-500 text-slate-200')
                         }`}>
                           <span className="font-extrabold uppercase tracking-widest text-[9px] opacity-75">↩️ Quoted Message</span>
                           <span className="truncate italic">"{quoteText}"</span>
@@ -1840,16 +1918,12 @@ export default function ChatInterface({
                     
                     <span className="text-xs text-slate-500 font-mono mt-1 pr-1 pl-1 flex items-center gap-1.5 select-none">
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
-                      {isSelf && (
-                        <span className={m.read ? 'text-sky-500' : 'text-slate-400'}>
-                          <CheckCheck className="w-4 h-4" />
-                        </span>
-                      )}
+                          {renderMessageDeliveryIndicator(m)}
                       
                       {/* Interactive dots click trigger option for mobile users specifically */}
                       <button 
                         onClick={() => setActiveMenuMessage(m)}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition p-1 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 rounded cursor-pointer ml-1"
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition p-1 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-200 hover:text-slate-600 rounded cursor-pointer ml-1"
                         title="Message options"
                       >
                         •••
@@ -1868,7 +1942,7 @@ export default function ChatInterface({
             )}
 
             {systemAlert && (
-              <div className="mx-auto max-w-sm p-3 bg-violet-500/5 border border-violet-500/20 rounded-xl text-[11px] text-center text-slate-400">
+              <div className="mx-auto max-w-sm p-3 bg-violet-500/5 border border-violet-500/20 rounded-xl text-[11px] text-center text-slate-200">
                 {systemAlert}
               </div>
             )}
@@ -1885,7 +1959,7 @@ export default function ChatInterface({
               <div className={`flex items-center justify-between p-2.5 px-4 mb-1 rounded-xl border font-sans text-xs shrink-0 animate-fade-in ${
                 theme === 'light'
                   ? 'bg-slate-100/80 border-slate-200 text-slate-700 shadow-sm'
-                  : 'bg-slate-900 border-slate-800/80 text-slate-300'
+                  : 'bg-slate-900 border-slate-800/80 text-slate-200'
               }`}>
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="flex flex-col min-w-0">
@@ -1898,7 +1972,7 @@ export default function ChatInterface({
                 <button
                   type="button"
                   onClick={() => setReplyingTo(null)}
-                  className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition cursor-pointer shrink-0 ml-4 font-bold text-slate-400 hover:text-rose-500 text-xs"
+                  className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition cursor-pointer shrink-0 ml-4 font-bold text-slate-200 hover:text-rose-500 text-xs"
                 >
                   ✕
                 </button>
@@ -1910,13 +1984,13 @@ export default function ChatInterface({
                 {/* Media Upload Buttons */}
                 <input type="file" ref={fileInputRef} onChange={(e) => { handleMediaUpload(e, 'image'); setShowGalleryMenu(false); }} accept="image/*" className="hidden" />
                 <input type="file" ref={cameraInputRef} onChange={(e) => { handleMediaUpload(e, 'image'); setShowGalleryMenu(false); }} accept="image/*" capture="environment" className="hidden" />
-                <input type="file" ref={voiceInputRef} onChange={(e) => handleMediaUpload(e, 'voice')} accept="audio/*" capture="microphone" className="hidden" />
+                <input type="file" ref={voiceInputRef} onChange={(e) => handleMediaUpload(e, 'voice')} accept="audio/*" capture="user" className="hidden" />
 
                 <div className="relative flex-shrink-0" ref={galleryRef}>
                   <button
                     type="button"
                     onClick={() => setShowGalleryMenu(!showGalleryMenu)}
-                    className={`p-3 sm:p-4 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-2xl border transition cursor-pointer ${theme === 'light' ? 'bg-white hover:bg-slate-100 text-slate-600' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'}`}
+                    className={`p-3 sm:p-4 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-2xl border transition cursor-pointer ${theme === 'light' ? 'bg-white hover:bg-slate-100 text-slate-600' : 'bg-slate-900 border-slate-800 text-slate-200 hover:text-white'}`}
                     title="Gallery Options"
                   >
                     <ImageIcon className="w-5 h-5" />
@@ -1946,7 +2020,7 @@ export default function ChatInterface({
                 <button
                   type="button"
                   onClick={isRecording ? stopPageRecording : startPageRecording}
-                  className={`p-3 sm:p-4 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-2xl border transition cursor-pointer shrink-0 ${isRecording ? 'bg-rose-500 text-white' : (theme === 'light' ? 'bg-white hover:bg-slate-100 text-slate-600' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white')}`}
+                  className={`p-3 sm:p-4 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-2xl border transition cursor-pointer shrink-0 ${isRecording ? 'bg-rose-500 text-white' : (theme === 'light' ? 'bg-white hover:bg-slate-100 text-slate-600' : 'bg-slate-900 border-slate-800 text-slate-200 hover:text-white')}`}
                   title={isRecording ? "Stop Recording" : "Send Voice Memo"}
                 >
                   {isRecording ? (
@@ -1982,7 +2056,7 @@ export default function ChatInterface({
                   disabled={!messageText.trim()}
                   className={`p-3 sm:p-4 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-2xl transition duration-150 cursor-pointer shadow-lg disabled:shadow-none shrink-0 ${
                     theme === 'light'
-                      ? 'bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 disabled:text-slate-400 text-white shadow-sky-500/10'
+                      ? 'bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 disabled:text-slate-200 text-white shadow-sky-500/10'
                       : 'bg-violet-600 disabled:bg-slate-900 disabled:text-slate-600 hover:bg-violet-500 text-white shadow-violet-500/10'
                   }`}
                 >
@@ -1996,7 +2070,7 @@ export default function ChatInterface({
                     className={`px-4 py-3 border text-xs font-semibold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-1.5 ${
                       theme === 'light'
                         ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                        : 'bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white'
+                        : 'bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-200 hover:text-white'
                     }`}
                   >
                     <span>Next</span>
@@ -2036,14 +2110,14 @@ export default function ChatInterface({
 
       {/* INSPECTED PEER DETAIL MODAL POPUP DISPLAY CARD */}
       {inspectedPeer && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-slate-100">
-          <div className={`w-full max-w-sm border rounded-3xl p-6 relative overflow-hidden shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 overflow-y-auto px-4 py-6 animate-fade-in text-slate-100">
+          <div className={`w-full max-w-sm max-h-[calc(100vh-5rem)] border rounded-3xl p-6 relative overflow-hidden shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
             <button 
               onClick={() => {
                 setInspectedPeer(null);
                 setIsAdminEditing(false);
               }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg p-1 cursor-pointer transition z-10"
+              className="absolute top-4 right-4 text-slate-200 hover:text-white text-lg p-1 cursor-pointer transition z-10"
             >
               ✕
             </button>
@@ -2056,7 +2130,7 @@ export default function ChatInterface({
                   <button 
                     type="button" 
                     onClick={() => setIsAdminEditing(false)} 
-                    className="text-[10px] text-slate-400 hover:text-rose-400 uppercase font-bold"
+                    className="text-[10px] text-slate-200 hover:text-rose-400 uppercase font-bold"
                   >
                     Cancel
                   </button>
@@ -2077,7 +2151,7 @@ export default function ChatInterface({
                     className="w-12 h-12 shrink-0 aspect-square rounded-full object-cover border border-violet-500/30"
                   />
                   <div className="space-y-1">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Override User Avatar</span>
+                    <span className="text-[9px] uppercase font-bold text-slate-200 block tracking-wider">Override User Avatar</span>
                     <label className="inline-block px-2.5 py-1 bg-violet-600 hover:bg-violet-500 text-white rounded text-[10px] font-bold cursor-pointer transition">
                       Upload Photo
                       <input type="file" accept="image/*" onChange={handleAdminFormAvatarUpload} className="hidden" />
@@ -2085,10 +2159,10 @@ export default function ChatInterface({
                   </div>
                 </div>
 
-                <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="space-y-2.5 max-h-[calc(100vh-19rem)] overflow-y-auto pr-1 custom-scrollbar">
                   {/* Username input */}
                   <div>
-                    <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Username</label>
+                    <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Username</label>
                     <input 
                       type="text"
                       required
@@ -2101,7 +2175,7 @@ export default function ChatInterface({
                   {/* Gender and Age selections */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Gender</label>
+                      <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Gender</label>
                       <select
                         value={adminEditForm.gender}
                         onChange={(e) => setAdminEditForm({ ...adminEditForm, gender: e.target.value })}
@@ -2114,7 +2188,7 @@ export default function ChatInterface({
                     </div>
 
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Age</label>
+                      <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Age</label>
                       <input 
                         type="number"
                         min="12"
@@ -2129,7 +2203,7 @@ export default function ChatInterface({
 
                   {/* Custom Bio description */}
                   <div>
-                    <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Bio</label>
+                    <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Bio</label>
                     <textarea 
                       rows={2}
                       value={adminEditForm.bio}
@@ -2141,7 +2215,7 @@ export default function ChatInterface({
                   {/* Location codes */}
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">City</label>
+                      <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">City</label>
                       <input 
                         type="text"
                         value={adminEditForm.city}
@@ -2150,7 +2224,7 @@ export default function ChatInterface({
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">State</label>
+                      <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">State</label>
                       <input 
                         type="text"
                         value={adminEditForm.state}
@@ -2159,7 +2233,7 @@ export default function ChatInterface({
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Country</label>
+                      <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Country</label>
                       <input 
                         type="text"
                         value={adminEditForm.country}
@@ -2172,7 +2246,7 @@ export default function ChatInterface({
                   {/* Badge VIP/Staff and Blocking status */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/45">
                     <div>
-                      <label className="block text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">Profile Badge</label>
+                      <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Profile Badge</label>
                       <select
                         value={adminEditForm.type}
                         onChange={(e) => setAdminEditForm({ ...adminEditForm, type: e.target.value })}
@@ -2219,10 +2293,10 @@ export default function ChatInterface({
                     {inspectedPeer.type === 'Admin' ? 'VibeChat ADMIN' : inspectedPeer.username}
                     {(inspectedPeer.type === 'Royal VIP') && <span className="text-[9px] bg-amber-500/15 border border-amber-500/35 text-amber-400 rounded-full px-2 py-0.5 font-extrabold font-display">👑 VIP</span>}
                     {(inspectedPeer.type === 'Moderator') && <span className="text-[9px] bg-indigo-500/15 border border-indigo-500/35 text-indigo-400 rounded-full px-2 py-0.5 font-extrabold font-display">🛡️ MODERATOR</span>}
-                    {(inspectedPeer.type === 'Admin') && <span className="text-[9px] bg-slate-500/15 border border-slate-500/35 text-slate-500 dark:text-slate-400 rounded-full px-2 py-0.5 font-extrabold font-display">⚙️ ADMIN</span>}
+                    {(inspectedPeer.type === 'Admin') && <span className="text-[9px] bg-slate-500/15 border border-slate-500/35 text-slate-500 dark:text-slate-200 rounded-full px-2 py-0.5 font-extrabold font-display">⚙️ ADMIN</span>}
                     {(inspectedPeer.type === 'Registered') && <span className="text-[9px] bg-emerald-500/15 border border-emerald-500/35 text-emerald-500 rounded-full px-2 py-0.5 font-extrabold font-display">📸 VERIFIED</span>}
                   </h3>
-                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mt-0.5">{inspectedPeer.type || 'Standard'} Companion</p>
+                  <p className="text-xs text-slate-200 font-semibold uppercase tracking-wider mt-0.5">{inspectedPeer.type || 'Standard'} Companion</p>
                 </div>
 
                 <div className={`w-full border rounded-2xl p-4 text-left text-xs space-y-2.5 ${theme === "light" ? "bg-slate-50 border-slate-200 text-slate-700" : "bg-slate-950/40 border-slate-800"}`}>
@@ -2245,15 +2319,15 @@ export default function ChatInterface({
                         : 'Recently'}
                     </span>
                   </div>
-                  {inspectedFullDetails?.bio && (
+                  {(inspectedFullDetails?.bio || inspectedPeer?.bio) && (
                     <div className="flex flex-col mt-2 pt-2 border-t border-slate-800/50">
                       <span className="text-slate-500 mb-1">Bio</span>
-                      <p className={`italic leading-relaxed whitespace-pre-wrap font-bold ${theme === "light" ? "text-slate-700" : "text-white"}`}>"{inspectedFullDetails.bio}"</p>
+                      <p className={`italic leading-relaxed whitespace-pre-wrap break-words font-bold ${theme === "light" ? "text-slate-700" : "text-white"}`}>&quot;{inspectedFullDetails?.bio || inspectedPeer?.bio}&quot;</p>
                     </div>
                   )}
                   <div className="flex justify-between">
                     <span className="text-slate-500">Last Seen</span>
-                    <span className={`font-bold ${theme === "light" ? "text-slate-700" : "text-slate-300"}`}>
+                    <span className={`font-bold ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
                       {inspectedFullDetails?.lastSeenAt 
                         ? formatLastSeen(inspectedFullDetails.lastSeenAt, inspectedFullDetails?.online)
                         : 'Recently'}
@@ -2261,7 +2335,7 @@ export default function ChatInterface({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Online</span>
-                    <span className={`font-bold ${inspectedFullDetails?.online ? 'text-emerald-500' : 'text-slate-400'}`}>
+                    <span className={`font-bold ${inspectedFullDetails?.online ? 'text-emerald-500' : 'text-slate-200'}`}>
                       {inspectedFullDetails?.online ? 'Active Now' : 'Offline'}
                     </span>
                   </div>
@@ -2317,7 +2391,7 @@ export default function ChatInterface({
           }`}>
             <button 
               onClick={() => setShowThemeModal(false)}
-              className="absolute top-6 right-6 text-slate-500 hover:text-slate-300 p-2 z-10 cursor-pointer"
+              className="absolute top-6 right-6 text-slate-500 hover:text-slate-200 p-2 z-10 cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -2331,7 +2405,7 @@ export default function ChatInterface({
               {wallpaper && (
                 <div className="space-y-3 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <h3 className={`text-xs uppercase font-bold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Background Opacity</h3>
+                    <h3 className={`text-xs uppercase font-bold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Background Opacity</h3>
                     <span className="text-sm font-mono text-violet-500 font-bold">{Math.round((wallpaperOpacity || 0.5) * 100)}%</span>
                   </div>
                   <input 
@@ -2346,7 +2420,7 @@ export default function ChatInterface({
 
               {/* Background Wallpapers List */}
               <div className="space-y-3">
-                <h3 className={`text-xs uppercase font-bold tracking-wider flex items-center justify-between ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
+                <h3 className={`text-xs uppercase font-bold tracking-wider flex items-center justify-between ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>
                   <span>Background Wallpaper</span>
                   <label className="text-violet-500 hover:text-violet-400 text-xs font-bold cursor-pointer flex items-center gap-1 transition">
                     <input type="file" accept="image/*" onChange={handleCustomWallpaperUpload} className="hidden" />
@@ -2408,10 +2482,10 @@ export default function ChatInterface({
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`text-center pb-3 border-b mb-4 ${theme === "light" ? "border-slate-100" : "border-slate-800"}`}>
-              <h4 className={`font-bold font-display text-sm tracking-wide uppercase ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
+              <h4 className={`font-bold font-display text-sm tracking-wide uppercase ${theme === 'light' ? 'text-slate-500' : 'text-slate-200'}`}>
                 Message Actions
               </h4>
-              <p className={`text-xs truncate italic mt-1.5 opacity-85 ${theme === 'light' ? 'text-slate-600' : 'text-stone-300'}`}>
+              <p className={`text-xs truncate italic mt-1.5 opacity-85 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>
                 "{activeMenuMessage.content || (activeMenuMessage.type === 'voice' ? 'Audio voice memo' : 'File attachment')}"
               </p>
             </div>
@@ -2472,7 +2546,7 @@ export default function ChatInterface({
               className={`w-full mt-4 py-2.5 rounded-xl border font-semibold text-xs tracking-wide transition cursor-pointer text-center ${
                 theme === "light" 
                   ? "bg-white border-slate-200 hover:bg-slate-50 text-slate-500" 
-                  : "bg-slate-800 border-slate-700/60 hover:bg-slate-700 text-slate-400 hover:text-white"
+                  : "bg-slate-800 border-slate-700/60 hover:bg-slate-700 text-slate-200 hover:text-white"
               }`}
             >
               Cancel
