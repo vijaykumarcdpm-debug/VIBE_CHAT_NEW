@@ -2054,11 +2054,10 @@ export default function App() {
             </div>
           </main>
 
-          <footer className="hidden sm:block border-t border-slate-800/60 bg-slate-950 py-6 text-center text-[10px] text-slate-500 relative z-10 select-none">
-            <p>© 2026 VibeChat stranger-chat platform. Fully encrypted socket communication networks.</p>
-          </footer>
+          {/* Footer - Only show before login on public pages */}
         </div>
       )}
+      
       </div>
 
       {showExitConfirm && (

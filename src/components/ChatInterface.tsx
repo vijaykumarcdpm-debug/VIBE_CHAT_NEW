@@ -214,7 +214,7 @@ export default function ChatInterface({
 
     if (status === 'read') {
       return (
-        <span className="text-sky-400" title="Read">
+        <span className={theme === 'light' ? 'text-sky-500' : 'text-sky-400'} title="Read">
           <CheckCheck className={iconClass} />
         </span>
       );
@@ -222,14 +222,14 @@ export default function ChatInterface({
 
     if (status === 'delivered') {
       return (
-        <span className="text-slate-200" title="Delivered">
+        <span className={theme === 'light' ? 'text-slate-500' : 'text-slate-400'} title="Delivered">
           <CheckCheck className={iconClass} />
         </span>
       );
     }
 
     return (
-      <span className="text-slate-200" title="Sent">
+      <span className={theme === 'light' ? 'text-slate-500' : 'text-slate-400'} title="Sent">
         <Check className={iconClass} />
       </span>
     );
@@ -513,6 +513,8 @@ export default function ChatInterface({
   const [cityFilter, setCityFilter] = useState<string>('');
   const [stateFilter, setStateFilter] = useState<string>('');
   const [showNoMatchPopup, setShowNoMatchPopup] = useState<boolean>(false);
+  const [showNoOnlineUsersPopup, setShowNoOnlineUsersPopup] = useState<boolean>(false);
+  const [isMatchingLoading, setIsMatchingLoading] = useState<boolean>(false);
   const matchSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // City/State normalization mapping
@@ -824,7 +826,9 @@ export default function ChatInterface({
         setChatState('direct');
         setSystemAlert(null);
         setSidebarTab('chat');
-        fetchSideData(); // clear unread count in side menu
+        // Immediately clear unread indicator for this peer
+        setRecents(prev => prev.map(r => r.peerId === peer.id ? { ...r, unreadCount: 0 } : r));
+        fetchSideData(); // sync with server
       } else {
         const errData = await res.json();
         if (errData.isLocked) {
@@ -847,12 +851,23 @@ export default function ChatInterface({
     }
 
     clearMatchSearchTimeout();
+    setIsMatchingLoading(true);
 
     const filters: any = {};
     if (genderFilter !== 'None') filters.gender = genderFilter;
     if (ageFilter) filters.age = ageFilter;
     if (cityFilter.trim()) filters.city = normalizeCity(cityFilter);
     if (stateFilter.trim()) filters.state = normalizeState(stateFilter);
+
+    // Check if there are any online users at all
+    const onlineUsersCount = onlineUsers.length;
+    
+    // If no online users at all, show immediately
+    if (onlineUsersCount === 0) {
+      setIsMatchingLoading(false);
+      setShowNoOnlineUsersPopup(true);
+      return;
+    }
 
     ws.send(JSON.stringify({
       event: 'match:start',
@@ -861,6 +876,7 @@ export default function ChatInterface({
 
     setChatState('searching');
     matchSearchTimeoutRef.current = setTimeout(() => {
+      setIsMatchingLoading(false);
       setShowNoMatchPopup(true);
       setChatState('idle');
     }, 20000);
@@ -868,6 +884,7 @@ export default function ChatInterface({
 
   const handleCancelMatching = () => {
     if (!ws) return;
+    setIsMatchingLoading(false);
     clearMatchSearchTimeout();
     ws.send(JSON.stringify({ event: 'match:cancel', data: {} }));
   };
@@ -1300,7 +1317,7 @@ export default function ChatInterface({
           {/* Search Box: filters users on current lists */}
           <div className={`p-3 border-b ${theme === 'light' ? 'border-slate-200 bg-slate-50/30' : 'border-slate-800/60 bg-slate-950/20'}`}>
             <div className="relative">
-              <Search className={`absolute left-3 top-2.5 w-3.5 h-3.5 ${theme === 'light' ? 'text-slate-200' : 'text-slate-200'}`} />
+              <Search className={`absolute left-3 top-2.5 w-3.5 h-3.5 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`} />
               <input
                 type="text"
                 placeholder={
@@ -1312,7 +1329,7 @@ export default function ChatInterface({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-9 pr-4 py-2 text-xs rounded-xl focus:outline-none transition border ${
                   theme === 'light'
-                    ? 'bg-white border-slate-200 text-slate-900 focus:border-sky-400 focus:ring-1 focus:ring-sky-100 placeholder-slate-400'
+                    ? 'bg-white border-slate-200 text-slate-900 focus:border-sky-400 focus:ring-1 focus:ring-sky-100 placeholder-slate-500'
                     : 'bg-slate-950/70 border-slate-800 text-white focus:border-violet-500 placeholder-slate-500'
                 }`}
               />
@@ -1329,10 +1346,10 @@ export default function ChatInterface({
                     Recent Chat Conversations
                   </h3>
                   <div className="flex gap-1.5 flex-wrap">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-rose-500/10 text-rose-500 border-rose-500/20 shrink-0">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${theme === 'light' ? 'bg-rose-50 text-rose-600 border-rose-300' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}>
                       {recents.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)} New Messages
                     </span>
-                    <span className="text-[9px] text-indigo-400 font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded-full border border-indigo-400/10 shrink-0">LIMITS ENABLED</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${theme === 'light' ? 'bg-indigo-50 text-indigo-600 border-indigo-300' : 'text-indigo-400 bg-indigo-500/10 border-indigo-400/10'}`}>LIMITS ENABLED</span>
                   </div>
                 </div>
                 
@@ -1409,7 +1426,7 @@ export default function ChatInterface({
                                   </span>
                                 )}
                               </div>
-<span className="text-sm text-slate-200 truncate block font-medium max-w-[220px]">{rc.lastMessage}</span>
+<span className={`text-sm truncate block font-medium max-w-[220px] ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>{rc.lastMessage}</span>
                             </div>
                           </button>
 
@@ -1431,7 +1448,7 @@ export default function ChatInterface({
                                 state: rc.peerState,
                                 country: rc.peerCountry
                               })}
-                              className={`p-1 rounded-md text-slate-500 hover:text-white hover:bg-slate-800 opacity-40 hover:opacity-100 transition`}
+                              className={`p-1 rounded-md transition opacity-60 hover:opacity-100 ${theme === 'light' ? 'text-slate-600 hover:text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
                               title="Inspect Profile"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -1471,17 +1488,17 @@ export default function ChatInterface({
                 {/* Active Online lists */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className={`text-[9px] uppercase font-bold tracking-wider font-display ${theme === 'light' ? 'text-slate-500' : 'text-slate-200'}`}>
+                    <h3 className={`text-[9px] uppercase font-bold tracking-wider font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>
                       Platform Directory
                     </h3>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 flex items-center gap-1 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${theme === 'light' ? 'bg-emerald-50 text-emerald-600 border-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.1)]' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.2)]'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       {filteredOnline.filter(ou => ou.online).length} Active Now
                     </span>
                   </div>
 
                   {filteredOnline.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-slate-200 italic">No users are currently online.</div>
+                    <div className={`py-8 text-center text-xs italic ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>No users are currently online.</div>
                   ) : (
                     <div className="space-y-3">
                       {filteredOnline.map((ou) => {
@@ -1519,7 +1536,7 @@ export default function ChatInterface({
                                   {ou.type === 'Registered' && <span title="Camera Verified" className="text-[13px] select-none">📸</span>}
                                 </span>
                                 {ou.bio && (
-                                  <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-200 max-w-full break-words whitespace-pre-wrap">
+                                  <p className={`text-sm leading-relaxed max-w-full break-words whitespace-pre-wrap ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
                                     {ou.bio}
                                   </p>
                                 )}
@@ -1651,9 +1668,21 @@ export default function ChatInterface({
                     <div className={`w-full pt-3 border-t ${theme === 'light' ? 'border-slate-200/70' : 'border-slate-700/70'}`}>
                       <button
                         onClick={handleStartMatching}
-                        className="w-full px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold uppercase tracking-wide text-xs shadow-lg shadow-violet-500/20 hover:scale-[1.01] duration-150 transition"
+                        disabled={isMatchingLoading}
+                        className={`w-full px-6 py-2.5 rounded-xl font-bold uppercase tracking-wide text-xs shadow-lg duration-150 transition flex items-center justify-center gap-2 ${
+                          isMatchingLoading
+                            ? 'bg-violet-500/50 text-white cursor-not-allowed'
+                            : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white hover:scale-[1.01] shadow-violet-500/20'
+                        }`}
                       >
-                        Start Matching
+                        {isMatchingLoading ? (
+                          <>
+                            <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                            Searching...
+                          </>
+                        ) : (
+                          'Start Matching'
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1677,7 +1706,7 @@ export default function ChatInterface({
                 <button
                   onClick={handleExitChat}
                   className={`p-2 -ml-2 rounded-xl transition cursor-pointer ${
-                    theme === 'light' ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-slate-800 text-slate-200'
+                    theme === 'light' ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-slate-800 text-slate-300'
                   }`}
                 >
                   <ChevronLeft className="w-6 h-6" />
@@ -1689,7 +1718,7 @@ export default function ChatInterface({
                     className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0 aspect-square rounded-full object-cover border border-violet-500/30"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" title="Online Status: Connected"></span>
+                  {partnerFocused && <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" title="Active in Chat"></span>}
                 </div>
  
                 <div className="min-w-0 flex flex-col gap-1.5">
@@ -1704,8 +1733,8 @@ export default function ChatInterface({
                   </div>
                   
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${onlineUsers.some(u => u.id === activePartner?.id) ? 'text-yellow-500' : 'text-rose-500'}`}>
-                      {onlineUsers.some(u => u.id === activePartner?.id) ? '● ONLINE' : '● OFFLINE'}
+                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${partnerFocused ? 'text-yellow-500' : 'text-rose-500'}`}>
+                      {partnerFocused ? '● ONLINE' : '● OFFLINE'}
                     </span>
 
                     {activePartner?.type === 'Royal VIP' && (
@@ -1858,21 +1887,21 @@ export default function ChatInterface({
           
           {/* REPORT OVERLAY DIALOG */}
           {showReportDialog && (
-            <div className="absolute inset-0 bg-slate-950/80 z-30 flex items-center justify-center p-6">
-              <div className={`p-6 rounded-2xl w-full max-w-sm border ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
-                <h4 className="font-bold font-display text-white text-base mb-2">File Abuse Complaint</h4>
-                <p className="text-xs text-slate-200 mb-4 leading-relaxed">Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
+            <div className="fixed inset-0 bg-slate-950/80 z-30 flex items-center justify-center p-4 animate-fade-in">
+              <div className={`p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] overflow-y-auto flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
+                <h4 className={`font-bold font-display text-base mb-2 shrink-0 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>File Abuse Complaint</h4>
+                <p className={`text-xs mb-4 leading-relaxed shrink-0 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
                 
-                <form onSubmit={handleReportUser} className="space-y-4">
+                <form onSubmit={handleReportUser} className="space-y-4 flex flex-col flex-1 min-h-0">
                   <textarea
                     required
                     rows={3}
                     value={reportReason}
                     onChange={(e) => setReportReason(e.target.value)}
                     placeholder="Harassment, explicit streams, spam links..."
-                    className={`w-full p-2.5 border text-xs rounded-lg focus:outline-none focus:border-rose-500 transition resize-none ${theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950 border-slate-800 text-white"}`}
+                    className={`w-full p-2.5 border text-xs rounded-lg focus:outline-none focus:border-rose-500 transition resize-none flex-1 ${theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950 border-slate-800 text-white"}`}
                   />
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button
                       type="submit"
                       className="w-1/2 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition font-bold text-xs"
@@ -2091,11 +2120,26 @@ export default function ChatInterface({
                   Try Again
                 </button>
               </div>
+            ) : showNoOnlineUsersPopup ? (
+              <div className="py-20 text-center space-y-4 max-w-sm mx-auto h-full flex flex-col justify-center items-center rounded-3xl border border-amber-500/20 bg-amber-500/5 shadow-lg">
+                <span className="text-4xl">👥</span>
+                <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>No users online</h4>
+                <p className="text-[11px] text-slate-500 max-w-xs">
+                  No users are currently online. Please try again later when more people are available.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setShowNoOnlineUsersPopup(false); setChatState('idle'); }}
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs uppercase tracking-wide transition shadow-lg shadow-violet-500/10"
+                >
+                  Okay
+                </button>
+              </div>
             ) : historyMessages.length === 0 ? (
               <div className="py-24 text-center space-y-4 max-w-xs mx-auto">
-                <span className="w-10 h-10 bg-violet-600/10 border border-violet-500/25 text-violet-400 rounded-full flex items-center justify-center mx-auto text-lg animate-bounce">💡</span>
-                <h4 className={`font-bold text-xs ${theme === 'light' ? 'text-slate-800' : 'text-white'}`}>Vibe Established!</h4>
-                <p className="text-[11px] text-slate-500 leading-relaxed">Start texting anonymously. Sockets are healthy. Have fun chatting!</p>
+                <span className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto text-lg animate-bounce border ${theme === 'light' ? 'bg-violet-100 border-violet-300' : 'bg-violet-600/10 border-violet-500/25'} ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>💡</span>
+                <h4 className={`font-bold text-xs ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Vibe Established!</h4>
+                <p className={`text-[11px] leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-500'}`}>Start texting anonymously. Sockets are healthy. Have fun chatting!</p>
               </div>
             ) : (
               historyMessages.map((m) => {
@@ -2164,14 +2208,14 @@ export default function ChatInterface({
                       )}
                     </div>
                     
-                    <span className="text-xs text-slate-500 font-mono mt-1 pr-1 pl-1 flex items-center gap-1.5 select-none">
+                    <span className={`text-xs font-mono mt-1 pr-1 pl-1 flex items-center gap-1.5 select-none ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                           {renderMessageDeliveryIndicator(m)}
                       
                       {/* Interactive dots click trigger option for mobile users specifically */}
                       <button 
                         onClick={() => setActiveMenuMessage(m)}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition p-1 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-200 hover:text-slate-600 rounded cursor-pointer ml-1"
+                        className={`opacity-0 group-hover:opacity-100 focus:opacity-100 transition p-1 rounded cursor-pointer ml-1 ${theme === 'light' ? 'hover:bg-slate-200 text-slate-500 hover:text-slate-700' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'}`}
                         title="Message options"
                       >
                         •••
@@ -2183,14 +2227,18 @@ export default function ChatInterface({
             )}
 
             {peerTyping && (
-              <div className="flex items-center gap-1.5 text-slate-500 text-[10px] animate-pulse">
+              <div className={`flex items-center gap-1.5 text-[10px] animate-pulse ${theme === 'light' ? 'text-slate-600' : 'text-slate-500'}`}>
                 <CornerDownRight className="w-3.5 h-3.5 text-violet-500" />
                 <span>Stranger typing a response...</span>
               </div>
             )}
 
             {systemAlert && (
-              <div className="mx-auto max-w-sm p-3 bg-violet-500/5 border border-violet-500/20 rounded-xl text-[11px] text-center text-slate-200">
+              <div className={`mx-auto max-w-sm p-3 rounded-xl text-[11px] text-center border ${
+                theme === 'light'
+                  ? 'bg-violet-50 border-violet-300 text-violet-800'
+                  : 'bg-violet-500/5 border-violet-500/20 text-slate-200'
+              }`}>
                 {systemAlert}
               </div>
             )}
