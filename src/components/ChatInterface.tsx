@@ -762,6 +762,16 @@ export default function ChatInterface({
     };
   }, [ws, activePartner]);
 
+  // Auto-refresh People/Chat Lobby when user enters tabs
+  useEffect(() => {
+    if ((sidebarTab === 'people' || sidebarTab === 'chat') && token) {
+      fetchSideData();
+      // Also set up periodic refresh every 10 seconds while on these tabs
+      const interval = setInterval(fetchSideData, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [sidebarTab, token]);
+
   // Fetch Message History on direct peer click
   const handleOpenConversation = async (peer: { id: string; username: string; gender: any; type: any; profilePic: string; city?: string; state?: string; country?: string }) => {
     try {

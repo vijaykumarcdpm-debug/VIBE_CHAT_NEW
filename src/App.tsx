@@ -549,23 +549,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('vibechat_token');
-    if (savedToken) {
-      tokenRef.current = savedToken;
-      setToken(savedToken);
-      return;
-    }
-
-    // NOTE: Do NOT auto-restore rejoin_token. Let user see HomePage first and choose to rejoin via One-Click button.
-    // Only restore if they explicitly click the rejoin button on HomePage.
-
-    const remembered = localStorage.getItem('vibechat_saved_token');
-    if (remembered) {
-      try { localStorage.setItem('vibechat_token', remembered); } catch (e) {}
-      tokenRef.current = remembered;
-      setToken(remembered);
-      return;
-    }
+    // NOTE: Do NOT auto-restore any token on app mount. 
+    // User must explicitly choose to rejoin via One-Click button on HomePage.
+    // This ensures the gateway (HomePage) is always shown first to new and returning visitors.
+    
+    // Only set token if it was explicitly passed by user action (e.g., login/register/rejoin)
+    // Never auto-restore from localStorage at app start.
   }, []);
 
   useEffect(() => {
@@ -940,6 +929,9 @@ export default function App() {
             ...prev
           ]);
         } else if (event === 'config:update') {
+          // Update platform config with new settings
+          setPlatformConfig(data);
+          
           if (data.announcement !== undefined && data.announcement !== announcement) {
             setAnnouncement(data.announcement);
             if (data.announcement) {
@@ -947,9 +939,10 @@ export default function App() {
                 {
                   id: `announcement-${Date.now()}`,
                   type: 'system',
-                  message: 'Platform Announcement: ' + data.announcement,
-                  read: false,
-                  timestamp: 'Just now'
+                  title: '📢 Platform Announcement Updated',
+                  msg: data.announcement,
+                  timestamp: 'Just now',
+                  read: false
                 },
                 ...prev
               ]);
@@ -1170,14 +1163,16 @@ export default function App() {
 
   const handleLogout = () => {
     clearAuthRetryTimer();
-    if (token && me && me.type !== 'Guest') {
-      localStorage.setItem('vibechat_saved_token', token);
-      localStorage.setItem('vibechat_saved_type', me.type);
-    } else {
-      localStorage.removeItem('vibechat_saved_token');
-      localStorage.removeItem('vibechat_saved_type');
-    }
+    
+    // Clear all auth tokens and session data
     localStorage.removeItem('vibechat_token');
+    localStorage.removeItem('vibechat_saved_token');
+    localStorage.removeItem('vibechat_saved_type');
+    
+    // Note: vibechat_rejoin_token and rejoin snapshot are preserved
+    // so returning users can see "One-Click Rejoin" button on HomePage
+    // Only the active session token is cleared.
+    
     setToken(null);
     setMe(null);
     setScreen('lobby');
