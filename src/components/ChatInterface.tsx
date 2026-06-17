@@ -559,6 +559,11 @@ export default function ChatInterface({
   // Timing refs
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef<boolean>(true);
+  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const peopleListScrollRef = useRef<HTMLDivElement>(null);
+  const chatListScrollRef = useRef<HTMLDivElement>(null);
+  const lastFetchTimeRef = useRef<number>(0);
 
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
 
@@ -601,6 +606,13 @@ export default function ChatInterface({
   }, [chatState, sidebarTab, activePartner]);
 
   const fetchSideData = async () => {
+    if (!mountedRef.current) return;
+    
+    // Debounce: max once per second to prevent rapid repeated calls
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 1000) return;
+    lastFetchTimeRef.current = now;
+
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
       
@@ -608,13 +620,18 @@ export default function ChatInterface({
       const recentsRes = await fetch('/api/messages-list', { headers });
       if (!recentsRes.ok) throw new Error(`messages-list failed: ${recentsRes.status}`);
       const recentsData = await recentsRes.json();
-      setRecents(recentsData.chats || []);
-      setRecentChatsLimitLocked(recentsData.hasMore || false);
+      if (mountedRef.current) {
+        setRecents(recentsData.chats || []);
+        setRecentChatsLimitLocked(recentsData.hasMore || false);
+      }
 
       // Online Users
       const onlineRes = await fetch('/api/users/online', { headers });
       if (!onlineRes.ok) throw new Error(`online users failed: ${onlineRes.status}`);
-      setOnlineUsers(await onlineRes.json());
+      const onlineData = await onlineRes.json();
+      if (mountedRef.current) {
+        setOnlineUsers(onlineData);
+      }
     } catch (e) {
       console.error('Error fetching chat lists', e);
     }
@@ -747,9 +764,13 @@ export default function ChatInterface({
             ...prev
           ]);
         } else if (event === 'friend:removed') {
-          fetchSideData();
+          // Debounced refresh: prevent hammering API from multiple socket events
+          if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+          fetchDebounceRef.current = setTimeout(fetchSideData, 500);
         } else if (event === 'stats:update') {
-          fetchSideData();
+          // Debounced refresh: prevent hammering API from multiple socket events
+          if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+          fetchDebounceRef.current = setTimeout(fetchSideData, 500);
         }
       } catch (err) {
         console.error('Websocket chat handler failed: ', err);
@@ -762,15 +783,29 @@ export default function ChatInterface({
     };
   }, [ws, activePartner]);
 
-  // Auto-refresh People/Chat Lobby when user enters tabs
+  // Continuous background refresh on mount - keeps data synchronized while app is open
   useEffect(() => {
-    if ((sidebarTab === 'people' || sidebarTab === 'chat') && token) {
-      fetchSideData();
-      // Also set up periodic refresh every 10 seconds while on these tabs
-      const interval = setInterval(fetchSideData, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [sidebarTab, token]);
+    mountedRef.current = true;
+    
+    // Initial fetch on mount
+    fetchSideData();
+    
+    // Set up background polling every 8 seconds (runs silently in background)
+    // Tab switching now feels instant because data is already fresh
+    const bgInterval = setInterval(() => {
+      if (mountedRef.current) {
+        fetchSideData();
+      }
+    }, 8000);
+    
+    return () => {
+      mountedRef.current = false;
+      clearInterval(bgInterval);
+      if (fetchDebounceRef.current) {
+        clearTimeout(fetchDebounceRef.current);
+      }
+    };
+  }, [token]);
 
   // Fetch Message History on direct peer click
   const handleOpenConversation = async (peer: { id: string; username: string; gender: any; type: any; profilePic: string; city?: string; state?: string; country?: string }) => {
@@ -1112,39 +1147,44 @@ export default function ChatInterface({
   };
 
   // Filter and Sort Recents list by VIP status (VIP priority), then peer name or last msg
-  let filteredRecents = recents
-    .filter(rc => {
-      const term = searchQuery.toLowerCase().trim();
-      if (!term) return true;
-      return rc.peerName.toLowerCase().includes(term) || (rc.peerCity && rc.peerCity.toLowerCase().includes(term));
-    })
-    .sort((a, b) => {
-      // 1: Pinned Unread VIP Messages
-      const aIsUnreadVIP = a.unreadCount > 0 && (a.peerType === 'Royal VIP' || a.peerType === 'Admin');
-      const bIsUnreadVIP = b.unreadCount > 0 && (b.peerType === 'Royal VIP' || b.peerType === 'Admin');
-      if (aIsUnreadVIP && !bIsUnreadVIP) return -1;
-      if (!aIsUnreadVIP && bIsUnreadVIP) return 1;
+  // Memoized to prevent unnecessary recalculations on every render
+  const filteredRecents = useMemo(() => {
+    let filtered = recents
+      .filter(rc => {
+        const term = searchQuery.toLowerCase().trim();
+        if (!term) return true;
+        return rc.peerName.toLowerCase().includes(term) || (rc.peerCity && rc.peerCity.toLowerCase().includes(term));
+      })
+      .sort((a, b) => {
+        // 1: Pinned Unread VIP Messages
+        const aIsUnreadVIP = a.unreadCount > 0 && (a.peerType === 'Royal VIP' || a.peerType === 'Admin');
+        const bIsUnreadVIP = b.unreadCount > 0 && (b.peerType === 'Royal VIP' || b.peerType === 'Admin');
+        if (aIsUnreadVIP && !bIsUnreadVIP) return -1;
+        if (!aIsUnreadVIP && bIsUnreadVIP) return 1;
 
-      // 2: Type priority
-      const getPriority = (type: string) => {
-        if (type === 'Admin') return 5;
-        if (type === 'Moderator') return 4;
-        if (type === 'Royal VIP') return 3;
-        if (type === 'Registered') return 2;
-        return 1; // Guest
-      };
-      const prioDiff = getPriority(b.peerType) - getPriority(a.peerType);
-      if (prioDiff !== 0) return prioDiff;
+        // 2: Type priority
+        const getPriority = (type: string) => {
+          if (type === 'Admin') return 5;
+          if (type === 'Moderator') return 4;
+          if (type === 'Royal VIP') return 3;
+          if (type === 'Registered') return 2;
+          return 1; // Guest
+        };
+        const prioDiff = getPriority(b.peerType) - getPriority(a.peerType);
+        if (prioDiff !== 0) return prioDiff;
 
-      // 3: Timestamp (newest first)
-      return b.timestamp - a.timestamp;
-    });
+        // 3: Timestamp (newest first)
+        return b.timestamp - a.timestamp;
+      });
+
+    const isUserVIP = me.type === 'Royal VIP' || me.type === 'Admin';
+    if (!isUserVIP && filtered.length > 4) {
+      return filtered.slice(0, 4);
+    }
+    return filtered;
+  }, [recents, searchQuery, me.type]);
 
   const isUserVIP = me.type === 'Royal VIP' || me.type === 'Admin';
-  const hasHiddenChats = !isUserVIP && filteredRecents.length > 4;
-  if (!isUserVIP) {
-    filteredRecents = filteredRecents.slice(0, 4);
-  }
 
   // Filter and Sort Online list by VIP status (VIP priority)
   const filteredOnline = useMemo(() => {
