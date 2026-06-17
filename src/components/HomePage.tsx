@@ -531,7 +531,7 @@ export default function HomePage({
                       <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">⚡ One-Click Instant Rejoin</span>
                       <span className="text-[9px] bg-indigo-500/20 px-2 py-0.5 rounded-full font-bold text-indigo-300 uppercase">{rejoinType}</span>
                     </div>
-                    <p className={`text-xs ${theme === 'light' ? 'text-slate-750' : 'text-slate-300'}`}>
+                    <p className={`text-xs ${theme === 'light' ? 'text-slate-600' : 'text-slate-300'}`}>
                       Welcome back! Would you like to instantly rejoin as <span className="font-extrabold text-indigo-400">{rejoinUsername}</span>?
                     </p>
                     <button 
@@ -661,7 +661,7 @@ export default function HomePage({
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Age</label>
                         <input
@@ -681,14 +681,14 @@ export default function HomePage({
                       </div>
 
                       <div>
-                        <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-650' : 'text-slate-400'}`}>Gender Identity</label>
+                        <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Gender Identity</label>
                         <select
                           required
                           value={guestGender}
                           onChange={(e) => setGuestGender(e.target.value as any)}
                           className={`w-full p-2.5 text-xs rounded-xl outline-none border transition cursor-pointer ${
                             theme === 'light'
-                              ? 'bg-slate-50 border-slate-200 text-slate-852 focus:border-blue-500'
+                              ? 'bg-slate-50 border-slate-200 text-slate-700 focus:border-blue-500'
                               : 'bg-slate-950 border-slate-800 text-slate-300 focus:border-violet-500'
                           }`}
                         >
@@ -832,7 +832,7 @@ export default function HomePage({
 
                       <div className="space-y-3">
                         <div>
-                          <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-650' : 'text-slate-400'}`}>Email Address</label>
+                          <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Email Address</label>
                           <input
                             type="email"
                             required
@@ -989,13 +989,13 @@ export default function HomePage({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-650' : 'text-slate-400'}`}>Gender</label>
+                        <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Gender</label>
                         <select
                           value={regGender}
                           onChange={(e) => setRegGender(e.target.value as any)}
                           className={`w-full p-2.5 text-xs rounded-xl outline-none border transition cursor-pointer ${
                             theme === 'light'
-                              ? 'bg-slate-50 border-slate-200 text-slate-852 focus:border-blue-500'
+                              ? 'bg-slate-50 border-slate-200 text-slate-700 focus:border-blue-500'
                               : 'bg-slate-950 border-slate-800 text-slate-300 focus:border-violet-500'
                           }`}
                         >
@@ -1005,7 +1005,7 @@ export default function HomePage({
                         </select>
                       </div>
                       <div>
-                        <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-650' : 'text-slate-400'}`}>Age</label>
+                        <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Age</label>
                         <input
                           type="number"
                           required
@@ -1015,7 +1015,7 @@ export default function HomePage({
                           min="18"
                           className={`w-full p-2.5 text-xs rounded-xl outline-none border transition cursor-pointer ${
                             theme === 'light'
-                              ? 'bg-slate-50 border-slate-200 text-slate-852 focus:border-blue-500'
+                              ? 'bg-slate-50 border-slate-200 text-slate-700 focus:border-blue-500'
                               : 'bg-slate-950 border-slate-800 text-slate-300 focus:border-violet-500'
                           }`}
                         />
@@ -1023,21 +1023,21 @@ export default function HomePage({
                     </div>
 
                     <div>
-                      <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-650' : 'text-slate-400'}`}>Date of Birth</label>
+                      <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Date of Birth</label>
                       <input
                         type="date"
                         value={regDob}
                         onChange={(e) => setRegDob(e.target.value)}
                         className={`w-full p-2.5 text-xs rounded-xl outline-none border transition cursor-pointer ${
                           theme === 'light'
-                            ? 'bg-slate-50 border-slate-200 text-slate-852 focus:border-blue-500'
+                            ? 'bg-slate-50 border-slate-200 text-slate-700 focus:border-blue-500'
                             : 'bg-slate-950 border-slate-800 text-slate-300 focus:border-violet-500'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 font-display ${theme === 'light' ? 'text-slate-650' : 'text-slate-400'}`}>Profile Picture</label>
+                      <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Profile Picture</label>
                       <div className="flex items-center gap-3">
                         {regPic ? (
                           <img

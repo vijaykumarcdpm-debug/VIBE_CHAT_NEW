@@ -124,25 +124,38 @@ export default function ChatInterface({
     const handlePopState = (e: PopStateEvent) => {
       // Re-push state so user doesn't leave on next back press
       window.history.pushState(null, '', window.location.pathname);
-      
+      let handled = false;
+
       if (activeMenuMessage) {
         setActiveMenuMessage(null);
+        handled = true;
       } else if (showReportDialog) {
         setShowReportDialog(false);
+        handled = true;
       } else if (showThemeModal) {
         setShowThemeModal(false);
+        handled = true;
       } else if (inspectedPeer) {
         setInspectedPeer(null);
+        handled = true;
       } else if (dropdownOpenRef.current) {
         setShowOptionsDropdown(false);
+        handled = true;
       } else if (chatState === 'matched' || chatState === 'direct') {
         handleExitChat();
         setSidebarTab('people');
-        fetchSideData(); 
+        fetchSideData();
+        handled = true;
       } else if (sidebarTab !== 'people') {
         setSidebarTab('people');
+        handled = true;
       } else {
         setShowExitDialog(true);
+        handled = true;
+      }
+
+      if (handled) {
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -361,6 +374,9 @@ export default function ChatInterface({
   const closeDropdownWithHistory = () => {
     if (showOptionsDropdown) {
       setShowOptionsDropdown(false);
+      if (window.history.state?.dropdownOpen) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
   };
 
@@ -515,6 +531,7 @@ export default function ChatInterface({
   const [showNoMatchPopup, setShowNoMatchPopup] = useState<boolean>(false);
   const [showNoOnlineUsersPopup, setShowNoOnlineUsersPopup] = useState<boolean>(false);
   const [isMatchingLoading, setIsMatchingLoading] = useState<boolean>(false);
+  const [showMatchErrorPopup, setShowMatchErrorPopup] = useState<boolean>(false);
   const matchSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // City/State normalization mapping
@@ -581,10 +598,36 @@ export default function ChatInterface({
     const handleHardwareBack = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (dropdownOpenRef.current) {
-        setShowOptionsDropdown(false);
-        if (window.history.state && window.history.state.dropdownOpen) {
-          window.history.back();
+        closeDropdownWithHistory();
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
         }
+        return;
+      }
+      if (activeMenuMessage) {
+        setActiveMenuMessage(null);
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (showReportDialog) {
+        setShowReportDialog(false);
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (showThemeModal) {
+        setShowThemeModal(false);
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (inspectedPeer) {
+        setInspectedPeer(null);
+        setIsAdminEditing(false);
         if (customEvent && customEvent.detail) {
           customEvent.detail.handled = true;
         }
@@ -592,10 +635,13 @@ export default function ChatInterface({
       }
       if (chatState !== 'idle') {
         handleExitChat();
+        setSidebarTab('people');
         if (customEvent && customEvent.detail) {
           customEvent.detail.handled = true;
         }
-      } else if (activePartner && sidebarTab === 'chat') {
+        return;
+      }
+      if (activePartner && sidebarTab === 'chat') {
         setActivePartner(null);
         if (customEvent && customEvent.detail) {
           customEvent.detail.handled = true;
@@ -605,7 +651,7 @@ export default function ChatInterface({
     window.addEventListener('app_hardware_back', handleHardwareBack);
     return () => window.removeEventListener('app_hardware_back', handleHardwareBack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatState, sidebarTab, activePartner]);
+  }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer]);
 
   const fetchSideData = async () => {
     if (!mountedRef.current) return;
@@ -659,9 +705,11 @@ export default function ChatInterface({
 
         if (event === 'match:searching') {
           setChatState('searching');
+          setIsMatchingLoading(true);
         } else if (event === 'match:stopped') {
           clearMatchSearchTimeout();
           setChatState('idle');
+          setIsMatchingLoading(false);
         } else if (event === 'match:success') {
           clearMatchSearchTimeout();
           setActivePartner({
@@ -676,6 +724,10 @@ export default function ChatInterface({
           });
           setHistoryMessages([]);
           setChatState('matched');
+          setIsMatchingLoading(false);
+          setShowNoMatchPopup(false);
+          setShowNoOnlineUsersPopup(false);
+          setShowMatchErrorPopup(false);
         } else if (event === 'chat:message') {
           // Message received from stranger/friend
           const incomingMsg: ChatMessage = data;
@@ -732,6 +784,9 @@ export default function ChatInterface({
         } else if (event === 'chat:presence') {
           if (activePartner && activePartner.id === data.userId) {
             setPartnerFocused(!!data.focusing);
+            if (data.online !== undefined) {
+              setActivePartner(prev => prev ? { ...prev, online: !!data.online } : prev);
+            }
           }
         } else if (event === 'chat:delete_message') {
           setHistoryMessages(prev => prev.filter(m => m.id !== data.messageId));
@@ -844,7 +899,11 @@ export default function ChatInterface({
 
   // MATCH POOL CONSTRAINTS
   const handleStartMatching = () => {
-    if (!ws) return;
+    if (!ws) {
+      setShowMatchErrorPopup(true);
+      return;
+    }
+    if (isMatchingLoading || chatState === 'searching') return;
     if (!isVIP && (genderFilter !== 'None' || ageFilter || cityFilter.trim() || stateFilter.trim())) {
       onTriggerVipPage();
       return;
@@ -859,34 +918,47 @@ export default function ChatInterface({
     if (cityFilter.trim()) filters.city = normalizeCity(cityFilter);
     if (stateFilter.trim()) filters.state = normalizeState(stateFilter);
 
-    // Check if there are any online users at all
+    // Check if there are any online users at all (live data)
     const onlineUsersCount = onlineUsers.length;
-    
-    // If no online users at all, show immediately
     if (onlineUsersCount === 0) {
       setIsMatchingLoading(false);
       setShowNoOnlineUsersPopup(true);
       return;
     }
 
-    ws.send(JSON.stringify({
-      event: 'match:start',
-      data: { filters }
-    }));
+    // Ensure socket is open before sending
+    try {
+      if (ws.readyState !== WebSocket.OPEN) {
+        throw new Error('socket-not-open');
+      }
+      ws.send(JSON.stringify({ event: 'match:start', data: { filters } }));
+    } catch (err) {
+      console.error('Failed to start matchmaking', err);
+      setIsMatchingLoading(false);
+      setShowMatchErrorPopup(true);
+      return;
+    }
 
     setChatState('searching');
+    // 60 second timeout as required
     matchSearchTimeoutRef.current = setTimeout(() => {
       setIsMatchingLoading(false);
       setShowNoMatchPopup(true);
       setChatState('idle');
-    }, 20000);
+    }, 60000);
   };
 
   const handleCancelMatching = () => {
-    if (!ws) return;
     setIsMatchingLoading(false);
     clearMatchSearchTimeout();
-    ws.send(JSON.stringify({ event: 'match:cancel', data: {} }));
+    if (!ws) return;
+    try {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'match:cancel', data: {} }));
+      }
+    } catch (err) {
+      console.warn('Failed to send match:cancel', err);
+    }
   };
 
   const handleNextStranger = () => {
@@ -899,6 +971,10 @@ export default function ChatInterface({
   };
 
   const handleExitChat = () => {
+    // If user exits while searching, make sure to cancel matchmaking
+    if (chatState === 'searching') {
+      handleCancelMatching();
+    }
     setChatState('idle');
     setActivePartner(null);
     setHistoryMessages([]);
@@ -948,6 +1024,33 @@ export default function ChatInterface({
       setTyping(false);
     }
   };
+
+  // Cancel matchmaking when user leaves the tab, closes the page, or component unmounts
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && chatState === 'searching') {
+        handleCancelMatching();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      if (chatState === 'searching') {
+        handleCancelMatching();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // ensure timers cleaned up
+      clearMatchSearchTimeout();
+      setIsMatchingLoading(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatState, ws]);
 
   // Dispatch typing status indicator
   const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1678,7 +1781,7 @@ export default function ChatInterface({
                         {isMatchingLoading ? (
                           <>
                             <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-                            Searching...
+                            Finding your perfect match...
                           </>
                         ) : (
                           'Start Matching'
@@ -1718,7 +1821,7 @@ export default function ChatInterface({
                     className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0 aspect-square rounded-full object-cover border border-violet-500/30"
                     referrerPolicy="no-referrer"
                   />
-                  {partnerFocused && <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" title="Active in Chat"></span>}
+                  <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${activePartner?.online ? 'bg-emerald-500' : 'bg-rose-500'}`} title={activePartner?.online ? 'Online' : 'Offline'}></span>
                 </div>
  
                 <div className="min-w-0 flex flex-col gap-1.5">
@@ -1733,9 +1836,14 @@ export default function ChatInterface({
                   </div>
                   
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${partnerFocused ? 'text-yellow-500' : 'text-rose-500'}`}>
-                      {partnerFocused ? '● ONLINE' : '● OFFLINE'}
+                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${activePartner?.online ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {activePartner?.online ? '● ONLINE' : '● OFFLINE'}
                     </span>
+                    {partnerFocused && activePartner?.online && (
+                      <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold rounded-full tracking-wider uppercase">
+                        Chat Active
+                      </span>
+                    )}
 
                     {activePartner?.type === 'Royal VIP' && (
                       <span className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-500 text-[10px] font-extrabold rounded-full tracking-wider uppercase">👑 VIP Badge</span>
@@ -1864,9 +1972,8 @@ export default function ChatInterface({
           {showExitDialog && (
             <div className="fixed inset-0 bg-slate-950/80 z-[300] flex items-center justify-center p-6">
               <div className={`p-6 rounded-2xl w-full max-w-sm border ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
-                <h4 className="font-bold font-display text-white text-base mb-2">Are you sure you want to quit?</h4>
-                <p className="text-xs text-slate-200 mb-6 leading-relaxed">You are about to exit the application.</p>
-                
+            <h4 className={`font-bold font-display text-base mb-2 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Are you sure you want to quit?</h4>
+            <p className={`text-xs mb-6 leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>You are about to exit the application.</p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowExitDialog(false)}
@@ -2077,9 +2184,21 @@ export default function ChatInterface({
                 <div className="w-full pt-3 border-t border-slate-700/50">
                   <button
                     onClick={handleStartMatching}
-                    className="w-full px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold uppercase font-display tracking-wide text-xs shadow-lg shadow-violet-500/20 hover:scale-[1.01] duration-150 cursor-pointer transition"
+                    disabled={isMatchingLoading}
+                    className={`w-full px-6 py-2.5 rounded-xl font-bold uppercase font-display tracking-wide text-xs shadow-lg duration-150 transition flex items-center justify-center gap-2 ${
+                      isMatchingLoading
+                        ? 'bg-violet-500/50 text-white cursor-not-allowed'
+                        : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white hover:scale-[1.01] shadow-violet-500/20'
+                    }`}
                   >
-                    Start Matching
+                    {isMatchingLoading ? (
+                      <>
+                        <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                        Searching...
+                      </>
+                    ) : (
+                      'Start Matching'
+                    )}
                   </button>
                 </div>
               </div>
@@ -2094,8 +2213,8 @@ export default function ChatInterface({
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Searching Stranger Matches...</h4>
-                  <p className="text-[11px] text-slate-200 animate-pulse">Scanning live socket pool. Connecting you immediately.</p>
+                  <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Finding your perfect match...</h4>
+                  <p className="text-[11px] text-slate-200 animate-pulse">Searching for users...</p>
                 </div>
 
                 <button
@@ -2130,6 +2249,19 @@ export default function ChatInterface({
                 <button
                   type="button"
                   onClick={() => { setShowNoOnlineUsersPopup(false); setChatState('idle'); }}
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs uppercase tracking-wide transition shadow-lg shadow-violet-500/10"
+                >
+                  Okay
+                </button>
+              </div>
+            ) : showMatchErrorPopup ? (
+              <div className="py-20 text-center space-y-4 max-w-sm mx-auto h-full flex flex-col justify-center items-center rounded-3xl border border-rose-500/10 bg-rose-50 shadow-lg">
+                <span className="text-4xl">⚠️</span>
+                <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Unable to start matchmaking</h4>
+                <p className="text-[11px] text-slate-500 max-w-xs">Unable to start matchmaking. Please try again.</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowMatchErrorPopup(false); setChatState('idle'); }}
                   className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs uppercase tracking-wide transition shadow-lg shadow-violet-500/10"
                 >
                   Okay
@@ -2406,14 +2538,14 @@ export default function ChatInterface({
 
       {/* INSPECTED PEER DETAIL MODAL POPUP DISPLAY CARD */}
       {inspectedPeer && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 overflow-y-auto px-4 py-6 animate-fade-in text-slate-100">
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in text-slate-100">
           <div className={`w-full max-w-sm max-h-[calc(100vh-5rem)] border rounded-3xl p-6 relative overflow-hidden shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
-            <button 
+            <button
               onClick={() => {
                 setInspectedPeer(null);
                 setIsAdminEditing(false);
               }}
-              className="absolute top-4 right-4 text-slate-200 hover:text-white text-lg p-1 cursor-pointer transition z-10"
+              className={`absolute top-4 right-4 text-lg p-1 cursor-pointer transition z-10 ${theme === 'light' ? 'text-slate-600 hover:text-slate-900' : 'text-slate-200 hover:text-white'}`}
             >
               ✕
             </button>
@@ -2685,9 +2817,9 @@ export default function ChatInterface({
           <div className={`w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
-            <button 
+            <button
               onClick={() => setShowThemeModal(false)}
-              className="absolute top-6 right-6 text-slate-500 hover:text-slate-200 p-2 z-10 cursor-pointer"
+              className={`absolute top-6 right-6 p-2 z-10 cursor-pointer ${theme === 'light' ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-200'}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>

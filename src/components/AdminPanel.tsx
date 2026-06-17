@@ -1340,7 +1340,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                   className="w-16 h-16 rounded-full object-cover border-2 border-violet-500/20"
                 />
                 <label className={`px-2.5 py-1 text-[9px] font-bold border rounded-lg transition cursor-pointer ${
-                  theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-750 text-violet-400 border-slate-700'
+                  theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-700 text-violet-400 border-slate-700'
                 }`}>
                   Upload New Avatar
                   <input type="file" accept="image/*" onChange={handleAdminAvatarUpload} className="hidden" />
@@ -1480,7 +1480,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                   type="button"
                   onClick={() => setEditingUser(null)}
                   className={`flex-1 py-2.5 font-bold rounded-xl text-xs uppercase tracking-wider transition border cursor-pointer ${
-                    theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-200'
+                    theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                   }`}
                 >
                   Cancel

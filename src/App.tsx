@@ -463,6 +463,11 @@ export default function App() {
         return;
       }
 
+      if (window.sessionStorage.getItem('vibe_back_handled') === 'true') {
+        window.sessionStorage.removeItem('vibe_back_handled');
+        return;
+      }
+
       window.history.pushState({ vibe_app: true }, "");
 
       if (showThemeModal) {
@@ -493,20 +498,27 @@ export default function App() {
       const evt = new CustomEvent('app_hardware_back', { detail: { handled: false } });
       window.dispatchEvent(evt);
 
-      if (!evt.detail.handled) {
-        if (screen === 'plans') {
-          setScreen('lobby');
-          setSidebarTab('people');
-        } else if (screen === 'geo') {
-          setScreen('lobby');
-        } else if (screen === 'admin') {
-          setScreen('lobby');
-        } else if (sidebarTab !== 'people') {
-          setSidebarTab('people');
-        } else {
-           setShowExitConfirm(true);
+      setTimeout(() => {
+        if (window.sessionStorage.getItem('vibe_back_handled') === 'true') {
+          window.sessionStorage.removeItem('vibe_back_handled');
+          return;
         }
-      }
+
+        if (!evt.detail.handled) {
+          if (screen === 'plans') {
+            setScreen('lobby');
+            setSidebarTab('people');
+          } else if (screen === 'geo') {
+            setScreen('lobby');
+          } else if (screen === 'admin') {
+            setScreen('lobby');
+          } else if (sidebarTab !== 'people') {
+            setSidebarTab('people');
+          } else {
+            setShowExitConfirm(true);
+          }
+        }
+      }, 0);
     };
     
     window.addEventListener('popstate', handlePopState);
@@ -851,6 +863,7 @@ export default function App() {
     socket.onopen = () => {
       console.log('[VibeChat WebSocket] Connection established successfully.');
       setIsReconnecting(false);
+      fetchStats();
     };
 
     socket.onmessage = (e) => {
@@ -874,7 +887,7 @@ export default function App() {
             ]);
           }
         } else if (event === 'stats:update') {
-          setGlobalStats(data);
+          setGlobalStats(data?.stats || data);
         } else if (event === 'auth:banned') {
           window.alert('You have been banned for violating the community rules. Your account is no longer existing because you have violated the community rules.');
           handleLogout();
@@ -1485,9 +1498,9 @@ export default function App() {
           <div className={`w-full max-w-lg max-h-[95vh] overflow-y-auto scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
-            <button 
+            <button
               onClick={() => setShowOwnProfileModal(false)}
-              className="absolute top-4 right-4 text-slate-200 hover:text-slate-300 text-lg p-1"
+              className={`absolute top-4 right-4 text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
             >
               ✕
             </button>
@@ -1506,7 +1519,7 @@ export default function App() {
                   className="w-12 h-12 rounded-full object-cover border-2 border-violet-500/20"
                 />
                 <label className={`px-2 py-0.5 text-[9px] font-bold border rounded-lg transition cursor-pointer ${
-                  theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-750 text-violet-400 border-slate-700'
+                  theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-700 text-violet-400 border-slate-700'
                 }`}>
                   Change picture
                   <input type="file" accept="image/png,image/jpeg" onChange={handleProfilePicUpload} className="hidden" />
@@ -1985,7 +1998,7 @@ export default function App() {
                           >
                             <div className="relative shrink-0">
                               <Users className="w-5 h-5" />
-                              {globalStats && globalStats.totalOnline > 0 && (
+                              {globalStats && (
                                 <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
                                   {globalStats.totalOnline}
                                 </span>
