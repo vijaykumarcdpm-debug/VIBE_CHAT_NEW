@@ -29,12 +29,14 @@ const ADMIN_LOGIN_STATE = new Map<string, { step: number; verifiedUsername?: boo
 interface MatchCandidate {
   userId: string;
   gender: 'Male' | 'Female' | 'Other';
+  age?: number;
   city: string;
   state: string;
   country: string;
   type: UserType;
   filters: {
     gender?: 'Male' | 'Female' | 'Other';
+    age?: string;
     country?: string;
     state?: string;
     city?: string;
@@ -177,19 +179,46 @@ function searchMatches() {
   }
 }
 
+function normalizeText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function matchAgeFilter(filter: string | undefined, targetAge: string): boolean {
+  if (!filter) return true;
+  const [min, max] = filter.split('-').map(Number);
+  const age = parseInt(targetAge, 10);
+  if (Number.isNaN(age)) return false;
+  return age >= min && age <= max;
+}
+
 function checkUserFilters(user: MatchCandidate, target: MatchCandidate): boolean {
-  // If user is not VIP, filters are ignored or empty
-  const hasGenderFilter = user.filters.gender && user.filters.gender !== target.gender;
-  if (hasGenderFilter) return false;
+  if (!user.filters) return true;
+  if (user.filters.gender && normalizeText(user.filters.gender) !== normalizeText(target.gender)) {
+    return false;
+  }
 
-  const hasCountryFilter = user.filters.country && user.filters.country.toLowerCase() !== target.country.toLowerCase();
-  if (hasCountryFilter) return false;
+  if (user.filters.age) {
+    const targetAge = target.age !== undefined ? target.age.toString() : '';
+    if (!matchAgeFilter(user.filters.age, targetAge)) {
+      return false;
+    }
+  }
 
-  const hasStateFilter = user.filters.state && user.filters.state.toLowerCase() !== target.state.toLowerCase();
-  if (hasStateFilter) return false;
+  const targetCountry = normalizeText(target.country || '');
+  const targetState = normalizeText(target.state || '');
+  const targetCity = normalizeText(target.city || '');
 
-  const hasCityFilter = user.filters.city && user.filters.city.toLowerCase() !== target.city.toLowerCase();
-  if (hasCityFilter) return false;
+  if (user.filters.country && normalizeText(user.filters.country) !== targetCountry) {
+    return false;
+  }
+
+  if (user.filters.state && normalizeText(user.filters.state) !== targetState) {
+    return false;
+  }
+
+  if (user.filters.city && normalizeText(user.filters.city) !== targetCity) {
+    return false;
+  }
 
   return true;
 }
@@ -1469,6 +1498,7 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
           MATCHING_QUEUE.push({
             userId: currentProfile.id,
             gender: currentProfile.gender,
+            age: currentProfile.age,
             city: currentProfile.city,
             state: currentProfile.state,
             country: currentProfile.country,

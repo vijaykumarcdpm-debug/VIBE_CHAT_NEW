@@ -556,15 +556,8 @@ export default function App() {
       return;
     }
 
-    // If no active token, try rejoin token (one-click rejoin) or saved token (remember-me)
-    const rejoinToken = localStorage.getItem('vibechat_rejoin_token');
-    if (rejoinToken) {
-      // ensure primary token key is populated and set state
-      try { localStorage.setItem('vibechat_token', rejoinToken); } catch (e) {}
-      tokenRef.current = rejoinToken;
-      setToken(rejoinToken);
-      return;
-    }
+    // NOTE: Do NOT auto-restore rejoin_token. Let user see HomePage first and choose to rejoin via One-Click button.
+    // Only restore if they explicitly click the rejoin button on HomePage.
 
     const remembered = localStorage.getItem('vibechat_saved_token');
     if (remembered) {
@@ -1188,6 +1181,7 @@ export default function App() {
     setToken(null);
     setMe(null);
     setScreen('lobby');
+    setSidebarTab('people');
     closeSocket();
     setActiveCall(null);
     setIncomingCall(null);

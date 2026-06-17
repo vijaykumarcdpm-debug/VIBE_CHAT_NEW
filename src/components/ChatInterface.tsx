@@ -509,9 +509,46 @@ export default function ChatInterface({
 
   // Filters (Royal VIP only)
   const [genderFilter, setGenderFilter] = useState<'Male' | 'Female' | 'Other' | 'None'>('None');
+  const [ageFilter, setAgeFilter] = useState<string>('');
   const [cityFilter, setCityFilter] = useState<string>('');
   const [stateFilter, setStateFilter] = useState<string>('');
-  const [countryFilter, setCountryFilter] = useState<string>('');
+  const [showNoMatchPopup, setShowNoMatchPopup] = useState<boolean>(false);
+  const matchSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // City/State normalization mapping
+  const cityNormalizationMap: Record<string, string> = {
+    'mysore': 'Mysuru',
+    'bangalore': 'Bengaluru',
+    'bombay': 'Mumbai',
+    'poona': 'Pune',
+    'lucknow': 'Lucknow',
+    'delhi': 'Delhi',
+    'hyderabad': 'Hyderabad',
+    'kolkata': 'Kolkata',
+    'kalkutta': 'Kolkata',
+    'madras': 'Chennai',
+    'cochin': 'Kochi',
+    'mysure': 'Mysuru',
+    'bombey': 'Mumbai',
+    'banglore': 'Bengaluru',
+    'bengalooru': 'Bengaluru'
+  };
+
+  const normalizeCity = (city: string): string => {
+    const lower = city.toLowerCase().trim();
+    return cityNormalizationMap[lower] || city.trim();
+  };
+
+  const normalizeState = (state: string): string => {
+    return state.trim();
+  };
+
+  const clearMatchSearchTimeout = () => {
+    if (matchSearchTimeoutRef.current) {
+      clearTimeout(matchSearchTimeoutRef.current);
+      matchSearchTimeoutRef.current = null;
+    }
+  };
 
   // Senders / Inputs
   const [messageText, setMessageText] = useState<string>('');
@@ -604,8 +641,10 @@ export default function ChatInterface({
         if (event === 'match:searching') {
           setChatState('searching');
         } else if (event === 'match:stopped') {
+          clearMatchSearchTimeout();
           setChatState('idle');
         } else if (event === 'match:success') {
+          clearMatchSearchTimeout();
           setActivePartner({
             id: data.peerId,
             username: data.peerName,
@@ -757,27 +796,34 @@ export default function ChatInterface({
   // MATCH POOL CONSTRAINTS
   const handleStartMatching = () => {
     if (!ws) return;
-
-    // Check VIP features trigger filters
-    if (!isVIP && (genderFilter !== 'None' || cityFilter || stateFilter || countryFilter)) {
+    if (!isVIP && (genderFilter !== 'None' || ageFilter || cityFilter.trim() || stateFilter.trim())) {
       onTriggerVipPage();
       return;
     }
 
+    clearMatchSearchTimeout();
+
     const filters: any = {};
     if (genderFilter !== 'None') filters.gender = genderFilter;
-    if (cityFilter.trim()) filters.city = cityFilter.trim();
-    if (stateFilter.trim()) filters.state = stateFilter.trim();
-    if (countryFilter.trim()) filters.country = countryFilter.trim();
+    if (ageFilter) filters.age = ageFilter;
+    if (cityFilter.trim()) filters.city = normalizeCity(cityFilter);
+    if (stateFilter.trim()) filters.state = normalizeState(stateFilter);
 
     ws.send(JSON.stringify({
       event: 'match:start',
       data: { filters }
     }));
+
+    setChatState('searching');
+    matchSearchTimeoutRef.current = setTimeout(() => {
+      setShowNoMatchPopup(true);
+      setChatState('idle');
+    }, 20000);
   };
 
   const handleCancelMatching = () => {
     if (!ws) return;
+    clearMatchSearchTimeout();
     ws.send(JSON.stringify({ event: 'match:cancel', data: {} }));
   };
 
@@ -1742,14 +1788,18 @@ export default function ChatInterface({
                     )}
                   </div>
                   
-                  {/* Grid showing all four filters matching user criteria: Gender, Country, State, City */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Match Preferences Panel - Gender, Age, City, State */}
+                  <div className="space-y-4">
+                    {/* Gender Filter */}
                     <div>
-                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">Target Gender</label>
+                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">Gender</label>
                       <select
                         value={genderFilter}
                         onChange={(e) => {
-                          if (!isVIP) { handleFilterClick('gender'); return; }
+                          if (e.target.value !== 'None' && !isVIP) { 
+                            handleFilterClick('gender');
+                            return; 
+                          }
                           setGenderFilter(e.target.value as any);
                         }}
                         className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border cursor-pointer ${
@@ -1759,65 +1809,89 @@ export default function ChatInterface({
                         }`}
                       >
                         <option value="None">Any Gender</option>
-                        <option value="Male">Male 👦</option>
-                        <option value="Female">Female 👧</option>
-                        <option value="Other">Other 🌈</option>
+                        <option value="Male" disabled={!isVIP}>Male 👦</option>
+                        <option value="Female" disabled={!isVIP}>Female 👧</option>
+                        <option value="Other" disabled={!isVIP}>Other 🌈</option>
                       </select>
                     </div>
+
+                    {/* Age Filter */}
                     <div>
-                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">Target Country</label>
-                      <input
-                        type="text"
-                        placeholder={!isVIP ? "🔒 Country (VIP)" : "e.g. India"}
-                        value={countryFilter}
-                        onClick={() => { if (!isVIP) { handleFilterClick('location'); } }}
-                        onChange={(e) => isVIP && setCountryFilter(e.target.value)}
-                        className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${
+                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">Age</label>
+                      <select
+                        value={ageFilter}
+                        onClick={() => { if (!isVIP) { handleFilterClick('age'); } }}
+                        onChange={(e) => {
+                          if (!isVIP) return;
+                          setAgeFilter(e.target.value);
+                        }}
+                        className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border cursor-pointer ${
                           theme === 'light'
-                            ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
+                            ? 'bg-slate-50 border-slate-200 text-slate-800'
                             : 'bg-slate-900/60 border-slate-800 text-white'
-                        }`}
-                      />
+                        } ${!isVIP ? 'opacity-75 cursor-not-allowed' : ''}`}
+                        disabled={!isVIP}
+                      >
+                        <option value="">Any Age</option>
+                        <option value="10-20">10 – 20</option>
+                        <option value="20-30">20 – 30</option>
+                        <option value="30-40">30 – 40</option>
+                        <option value="40-50">40 – 50</option>
+                        <option value="50-60">50 – 60</option>
+                        <option value="60-70">60 – 70</option>
+                      </select>
                     </div>
+
+                    {/* City Filter */}
                     <div>
-                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">Target State</label>
+                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">City</label>
                       <input
                         type="text"
-                        placeholder={!isVIP ? "🔒 State (VIP)" : "e.g. Karnataka"}
-                        value={stateFilter}
-                        onClick={() => { if (!isVIP) { handleFilterClick('location'); } }}
-                        onChange={(e) => isVIP && setStateFilter(e.target.value)}
-                        className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${
-                          theme === 'light'
-                            ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
-                            : 'bg-slate-900/60 border-slate-800 text-white'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">Target City</label>
-                      <input
-                        type="text"
-                        placeholder={!isVIP ? "🔒 City (VIP)" : "e.g. Bengaluru"}
+                        placeholder={!isVIP ? "🔒 City (VIP Only)" : "e.g. Bengaluru"}
                         value={cityFilter}
-                        onClick={() => { if (!isVIP) { handleFilterClick('location'); } }}
-                        onChange={(e) => isVIP && setCityFilter(e.target.value)}
+                        onClick={() => { if (!isVIP) { handleFilterClick('city'); } }}
+                        onChange={(e) => {
+                          if (!isVIP) return;
+                          setCityFilter(e.target.value);
+                        }}
+                        disabled={!isVIP}
                         className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${
                           theme === 'light'
                             ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
                             : 'bg-slate-900/60 border-slate-800 text-white'
-                        }`}
+                        } ${!isVIP ? 'opacity-75 cursor-not-allowed' : ''}`}
+                      />
+                    </div>
+
+                    {/* State Filter */}
+                    <div>
+                      <label className="text-slate-500 text-[8px] uppercase font-bold tracking-wider block mb-1">State</label>
+                      <input
+                        type="text"
+                        placeholder={!isVIP ? "🔒 State (VIP Only)" : "e.g. Karnataka"}
+                        value={stateFilter}
+                        onClick={() => { if (!isVIP) { handleFilterClick('state'); } }}
+                        onChange={(e) => {
+                          if (!isVIP) return;
+                          setStateFilter(e.target.value);
+                        }}
+                        disabled={!isVIP}
+                        className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${
+                          theme === 'light'
+                            ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
+                            : 'bg-slate-900/60 border-slate-800 text-white'
+                        } ${!isVIP ? 'opacity-75 cursor-not-allowed' : ''}`}
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="w-full pt-2">
+                <div className="w-full pt-3 border-t border-slate-700/50">
                   <button
                     onClick={handleStartMatching}
-                    className="px-8 py-3.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-sky-500 hover:from-violet-500 hover:to-sky-400 text-white rounded-2xl font-bold uppercase font-display tracking-widest text-xs shadow-lg shadow-violet-500/15 hover:scale-[1.01] duration-150 cursor-pointer animate-pulse"
+                    className="w-full px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold uppercase font-display tracking-wide text-xs shadow-lg shadow-violet-500/20 hover:scale-[1.01] duration-150 cursor-pointer transition"
                   >
-                    🔮 Start Matching Sockets
+                    Start Matching
                   </button>
                 </div>
               </div>
@@ -1841,6 +1915,21 @@ export default function ChatInterface({
                   className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs uppercase tracking-wide cursor-pointer transition shadow-lg shadow-rose-500/10"
                 >
                   🛑 Cancel Matching
+                </button>
+              </div>
+            ) : showNoMatchPopup ? (
+              <div className="py-20 text-center space-y-4 max-w-sm mx-auto h-full flex flex-col justify-center items-center rounded-3xl border border-rose-500/20 bg-rose-500/5 shadow-lg">
+                <span className="text-4xl">🔍</span>
+                <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>No users found</h4>
+                <p className="text-[11px] text-slate-500 max-w-xs">
+                  We searched the live matching pool but could not find a compatible partner right now. Try again or broaden your filters.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setShowNoMatchPopup(false); setChatState('idle'); }}
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs uppercase tracking-wide transition shadow-lg shadow-violet-500/10"
+                >
+                  Try Again
                 </button>
               </div>
             ) : historyMessages.length === 0 ? (
