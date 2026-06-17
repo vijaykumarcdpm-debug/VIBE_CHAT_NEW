@@ -631,6 +631,9 @@ export default function App() {
     const state = localStorage.getItem('vibechat_rejoin_state') || detectedGeo.state || '';
     const country = localStorage.getItem('vibechat_rejoin_country') || detectedGeo.country || '';
     const ageValue = parseInt(localStorage.getItem('vibechat_rejoin_age') || '0', 10);
+    const vipExpiresAt = localStorage.getItem('vibechat_rejoin_vipExpiresAt');
+    const isModerator = localStorage.getItem('vibechat_rejoin_isModerator') === 'true';
+    const photoVerified = localStorage.getItem('vibechat_rejoin_photoVerified') === 'true';
 
     return {
       id: localStorage.getItem('vibechat_rejoin_id') || '',
@@ -645,8 +648,65 @@ export default function App() {
       age: Number.isNaN(ageValue) ? undefined : ageValue,
       online: true,
       createdAt: localStorage.getItem('vibechat_rejoin_createdAt') || new Date().toISOString(),
+      vipExpiresAt: vipExpiresAt || undefined,
+      isModerator: isModerator || undefined,
+      photoVerified: photoVerified || undefined,
       blockedUsers: []
     };
+  };
+
+  const attemptGuestRejoinFromStoredDevice = async (): Promise<boolean> => {
+    const snapshot = loadRejoinSnapshot();
+    const deviceId = typeof window !== 'undefined' ? localStorage.getItem('vibechat_device_id') : null;
+
+    if (!snapshot || snapshot.type !== 'Guest' || !snapshot.username || !snapshot.id || !deviceId) {
+      return false;
+    }
+
+    try {
+      const res = await fetch('/api/auth/guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: snapshot.username,
+          gender: snapshot.gender,
+          age: snapshot.age,
+          city: snapshot.city,
+          state: snapshot.state,
+          country: snapshot.country,
+          profilePic: snapshot.profilePic,
+          deviceId
+        })
+      });
+
+      if (!res.ok) {
+        return false;
+      }
+
+      const body = await res.json();
+      const updatedProfile = body.user;
+      const token = body.token;
+      if (!token || !updatedProfile) {
+        return false;
+      }
+
+      localStorage.setItem('vibechat_token', token);
+      tokenRef.current = token;
+      setToken(token);
+      saveRejoinSnapshot(updatedProfile, token);
+      setMe(updatedProfile);
+      setDetectedGeo({
+        city: updatedProfile.city || snapshot.city || detectedGeo.city,
+        state: updatedProfile.state || snapshot.state || detectedGeo.state,
+        country: updatedProfile.country || snapshot.country || detectedGeo.country
+      });
+      fetchStats();
+      showToast(`Welcome back! Restoring your previous guest profile as ${updatedProfile.username}.`);
+      return true;
+    } catch (e) {
+      console.warn('[VibeChat Rejoin Error] Failed restoring guest session from stored device:', e);
+      return false;
+    }
   };
 
   const saveRejoinSnapshot = (profile: Partial<UserProfile>, token: string) => {
@@ -679,6 +739,15 @@ export default function App() {
     }
     if (profile.profilePic) {
       localStorage.setItem('vibechat_rejoin_profilePic', profile.profilePic);
+    }
+    if (profile.vipExpiresAt) {
+      localStorage.setItem('vibechat_rejoin_vipExpiresAt', profile.vipExpiresAt);
+    }
+    if (profile.isModerator) {
+      localStorage.setItem('vibechat_rejoin_isModerator', String(profile.isModerator));
+    }
+    if (profile.photoVerified) {
+      localStorage.setItem('vibechat_rejoin_photoVerified', String(profile.photoVerified));
     }
     if (profile.createdAt) {
       localStorage.setItem('vibechat_rejoin_createdAt', profile.createdAt);
@@ -760,12 +829,17 @@ export default function App() {
           return;
         }
         if (res.status === 401 || res.status === 403 || res.status === 404) {
-          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing invalid tokens and stopping retry.');
+          console.warn('[VibeChat Auth Error] User credentials rejected. Attempting safe guest rejoin fallback...');
           clearAuthRetryTimer();
+          const currentRejoinToken = localStorage.getItem('vibechat_rejoin_token');
+          if (currentRejoinToken && currentRejoinToken === currentToken) {
+            const restored = await attemptGuestRejoinFromStoredDevice();
+            if (restored) {
+              return;
+            }
+          }
+          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing active auth token.');
           localStorage.removeItem('vibechat_token');
-          localStorage.removeItem('vibechat_rejoin_token');
-          localStorage.removeItem('vibechat_saved_token');
-          localStorage.removeItem('vibechat_saved_type');
           tokenRef.current = null;
           setToken(null);
           handleLogout();
@@ -1640,32 +1714,44 @@ export default function App() {
               setTheme(nextTheme);
               localStorage.setItem('vibechat_theme', nextTheme);
             }}
-            onRejoin={() => {
-  const tok = localStorage.getItem('vibechat_rejoin_token');
-  const snapshot = loadRejoinSnapshot();
+            onRejoin={async () => {
+              const snapshot = loadRejoinSnapshot();
+              const hasStoredDevice = typeof window !== 'undefined' && !!localStorage.getItem('vibechat_device_id');
 
-  if (tok) {
-    try { localStorage.setItem('vibechat_token', tok); } catch (e) {}
-    try { localStorage.setItem('vibechat_saved_token', tok); } catch (e) {}
+              if (snapshot?.type === 'Guest' && hasStoredDevice) {
+                const restored = await attemptGuestRejoinFromStoredDevice();
+                if (restored) {
+                  setScreen('lobby');
+                  setSidebarTab('people');
+                  return;
+                }
+              }
 
-    tokenRef.current = tok;
-    setToken(tok);
-    setScreen('lobby');
-    setSidebarTab('people');
+              const tok = localStorage.getItem('vibechat_rejoin_token');
+              if (tok) {
+                try { localStorage.setItem('vibechat_token', tok); } catch (e) {}
+                try { localStorage.setItem('vibechat_saved_token', tok); } catch (e) {}
 
-    if (snapshot) {
-      setMe(snapshot as UserProfile);
-      setDetectedGeo({
-        city: snapshot.city || detectedGeo.city,
-        state: snapshot.state || detectedGeo.state,
-        country: snapshot.country || detectedGeo.country
-      });
-    }
+                tokenRef.current = tok;
+                setToken(tok);
+                setScreen('lobby');
+                setSidebarTab('people');
 
-    fetchLatestProfile();
-    showToast('Welcome back! Restoring your People Lobby session.');
-  }
-}}
+                if (snapshot) {
+                  setMe(snapshot as UserProfile);
+                  setDetectedGeo({
+                    city: snapshot.city || detectedGeo.city,
+                    state: snapshot.state || detectedGeo.state,
+                    country: snapshot.country || detectedGeo.country
+                  });
+                }
+
+                fetchLatestProfile();
+                showToast('Welcome back! Restoring your People Lobby session.');
+              } else {
+                showToast('No stored guest session found. Please enter as guest.', true);
+              }
+            }}
           />
         )
       ) : (
@@ -1916,7 +2002,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">PEOPLE_TEST</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
                           </button>
 
                           <button
@@ -1935,7 +2021,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">CHAT_TEST</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
                           </button>
 
                           <button
@@ -1947,7 +2033,7 @@ export default function App() {
                             }`}
                           >
                             <Smile className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">MATCHING_TEST</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
                           </button>
 
                           <button
@@ -1959,7 +2045,7 @@ export default function App() {
                             }`}
                           >
                             <Sparkles className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">VIP_TEST</span>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
                           </button>
                         </nav>
                       )}

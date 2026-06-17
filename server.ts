@@ -676,39 +676,9 @@ APP.post('/api/auth/admin-login', (req, res) => {
 
 // Current Auth User
 APP.get('/api/auth/me', authenticateToken, (req: any, res) => {
-  let user = dbManager.getUser(req.user.id);
+  const user = dbManager.getUser(req.user.id);
   if (!user) {
-    if (req.user && req.user.id) {
-      const type = req.user.type || 'Guest';
-      const userGender = req.user.gender || 'Other';
-      const defaultPic = userGender === 'Male' 
-        ? "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%236366f1'/><circle cx='50' cy='35' r='18' fill='%23ffffff'/><path d='M50,58 C32,58 20,72 20,85 L80,85 C80,72 68,58 50,58 Z' fill='%23ffffff'/></svg>" 
-        : (userGender === 'Female' 
-           ? "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23ec4899'/><circle cx='50' cy='35' r='18' fill='%23ffffff'/><path d='M50,58 C32,58 20,72 20,85 L80,85 C80,72 68,58 50,58 Z' fill='%23ffffff'/></svg>" 
-           : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23a855f7'/><circle cx='50' cy='35' r='18' fill='%23ffffff'/><path d='M50,58 C32,58 20,72 20,85 L80,85 C80,72 68,58 50,58 Z' fill='%23ffffff'/></svg>");
-      
-      user = {
-        id: req.user.id,
-        username: req.user.username || (type === 'Guest' ? 'Guest_' + req.user.id.substring(Math.max(0, req.user.id.length - 6)) : 'User_' + req.user.id.substring(Math.max(0, req.user.id.length - 6))),
-        email: req.user.email || undefined,
-        deviceId: 'restored-session-device',
-        gender: userGender,
-        profilePic: req.user.profilePic || defaultPic,
-        online: true,
-        type: type,
-        city: 'VibeChat Lounge',
-        state: 'Online',
-        country: 'Worldwide',
-        originalCity: 'VibeChat Lounge',
-        originalState: 'Online',
-        originalCountry: 'Worldwide',
-        createdAt: new Date().toISOString()
-      };
-      dbManager.addUser(user);
-      console.log(`[VibeChat Session Restore] On-the-fly session recovery for: ${user.username} (${user.type})`);
-    } else {
-      return res.status(404).json({ error: 'User profile session not found' });
-    }
+    return res.status(404).json({ error: 'User profile session not found' });
   }
 
   if (user.isBanned) {
