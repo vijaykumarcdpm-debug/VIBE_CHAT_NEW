@@ -1487,17 +1487,126 @@ export default function ChatInterface({
 
             {/* 3. LOUNGE TAB VIEW */}
             {sidebarTab === 'lounge' && (
-              <div className="p-3 py-10 text-center space-y-4">
-                <div className="w-16 h-16 mx-auto bg-violet-500/20 rounded-full flex items-center justify-center">
-                  <Smile className="w-8 h-8 text-violet-400" />
-                </div>
-                <div>
-                  <h3 className={`text-sm font-bold font-display ${theme === 'light' ? 'text-slate-800' : 'text-slate-200'}`}>
-                    Match Room Lounge
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-2 max-w-[220px] mx-auto leading-relaxed">
-                    Use the matching panel on the right to discover and connect with new people instantly.
-                  </p>
+              <div className="p-3 space-y-4">
+                <div className="grid gap-4 lg:grid-cols-[1fr_minmax(320px,360px)]">
+                  <div className={`p-6 rounded-3xl transition ${theme === 'light' ? 'bg-white border border-slate-200 shadow-sm text-slate-900' : 'bg-slate-950/80 border border-slate-800 shadow-black/20 text-white'}`}>
+                    <div className="w-16 h-16 mb-5 mx-auto bg-violet-500/20 rounded-full flex items-center justify-center">
+                      <Smile className="w-8 h-8 text-violet-400" />
+                    </div>
+                    <div className="space-y-3 text-center">
+                      <h3 className={`text-sm font-bold font-display ${theme === 'light' ? 'text-slate-800' : 'text-slate-200'}`}>
+                        Match Room Lounge
+                      </h3>
+                      <p className={`text-xs mx-auto max-w-[260px] leading-relaxed ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Use the matching panel on the right to discover and connect with new people instantly.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`p-5 rounded-3xl border transition ${theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-slate-950/70 border-slate-800 text-white'}`}>
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-sm font-bold font-display tracking-tight flex items-center gap-2">
+                          <span>🎯</span>
+                          <span>Match Preferences</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mt-1 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}">
+                          Set your preference filters before searching for a match.
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className={`text-[8px] uppercase font-bold tracking-wider block mb-1 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Gender</label>
+                          <select
+                            value={genderFilter}
+                            onChange={(e) => {
+                              if (e.target.value !== 'None' && !isVIP) {
+                                handleFilterClick('gender');
+                                return;
+                              }
+                              setGenderFilter(e.target.value as any);
+                            }}
+                            className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900/60 border-slate-800 text-white'}`}
+                          >
+                            <option value="None">Any Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={`text-[8px] uppercase font-bold tracking-wider block mb-1 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Age</label>
+                          <select
+                            value={ageFilter}
+                            onClick={() => { if (!isVIP) { handleFilterClick('age'); } }}
+                            onChange={(e) => {
+                              if (!isVIP) {
+                                handleFilterClick('age');
+                                return;
+                              }
+                              setAgeFilter(e.target.value);
+                            }}
+                            className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900/60 border-slate-800 text-white'} ${!isVIP ? 'opacity-75 cursor-pointer' : ''}`}
+                          >
+                            <option value="">Any Age</option>
+                            <option value="10-20">10–20</option>
+                            <option value="20-30">20–30</option>
+                            <option value="30-40">30–40</option>
+                            <option value="40-50">40–50</option>
+                            <option value="50-60">50–60</option>
+                            <option value="60-70">60–70</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={`text-[8px] uppercase font-bold tracking-wider block mb-1 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>City</label>
+                          <input
+                            type="text"
+                            placeholder={!isVIP ? '🔒 City (VIP Only)' : 'Manual text input'}
+                            value={cityFilter}
+                            onClick={() => { if (!isVIP) { handleFilterClick('city'); } }}
+                            onChange={(e) => {
+                              if (!isVIP) {
+                                return;
+                              }
+                              setCityFilter(e.target.value);
+                            }}
+                            readOnly={!isVIP}
+                            className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 placeholder-slate-400' : 'bg-slate-900/60 border-slate-800 text-white placeholder-slate-500'} ${!isVIP ? 'opacity-75 cursor-pointer' : ''}`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`text-[8px] uppercase font-bold tracking-wider block mb-1 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>State</label>
+                          <input
+                            type="text"
+                            placeholder={!isVIP ? '🔒 State (VIP Only)' : 'Manual text input'}
+                            value={stateFilter}
+                            onClick={() => { if (!isVIP) { handleFilterClick('state'); } }}
+                            onChange={(e) => {
+                              if (!isVIP) {
+                                return;
+                              }
+                              setStateFilter(e.target.value);
+                            }}
+                            readOnly={!isVIP}
+                            className={`w-full p-2 text-xs rounded-lg focus:outline-none transition border ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 placeholder-slate-400' : 'bg-slate-900/60 border-slate-800 text-white placeholder-slate-500'} ${!isVIP ? 'opacity-75 cursor-pointer' : ''}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`w-full pt-3 border-t ${theme === 'light' ? 'border-slate-200/70' : 'border-slate-700/70'}`}>
+                      <button
+                        onClick={handleStartMatching}
+                        className="w-full px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold uppercase tracking-wide text-xs shadow-lg shadow-violet-500/20 hover:scale-[1.01] duration-150 transition"
+                      >
+                        Start Matching
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
