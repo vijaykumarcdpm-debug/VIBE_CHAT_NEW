@@ -1283,8 +1283,8 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
       )}
 
       {inspectingVerificationPhoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className={`relative max-w-sm w-full p-4 rounded-2xl shadow-2xl ${theme === 'light' ? 'bg-white' : 'bg-slate-900 border border-slate-800'}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden animate-fade-in">
+          <div className={`relative max-w-sm w-full p-4 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto ${theme === 'light' ? 'bg-white' : 'bg-slate-900 border border-slate-800'}`}>
             <h3 className={`font-bold font-display text-base tracking-tight mb-3 ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
               Review Verification Photo
             </h3>
@@ -1320,7 +1320,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
       )}
 
       {editForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-hidden animate-fade-in text-slate-100">
           <div className={`relative max-w-lg w-full p-6 rounded-3xl border shadow-2xl overflow-y-auto max-h-[90vh] scrollbar-thin transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>

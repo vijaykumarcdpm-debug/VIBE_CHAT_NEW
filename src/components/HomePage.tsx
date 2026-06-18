@@ -623,7 +623,7 @@ export default function HomePage({
               {/* Auth Modals */}
               {authView !== 'none' && (
                 <div 
-                  className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in" 
+                  className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-hidden animate-fade-in" 
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
                       setAuthView('none');
@@ -631,7 +631,7 @@ export default function HomePage({
                   }}
                 >
                   <div 
-                    className={`w-full max-w-md rounded-3xl p-6 relative overflow-y-auto max-h-[90vh] shadow-2xl border ${
+                    className={`w-full max-w-md rounded-3xl p-6 relative overflow-y-auto max-h-[calc(100vh-4rem)] shadow-2xl border ${
                       theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 text-slate-100'
                     }`}
                     onClick={(e) => e.stopPropagation()}

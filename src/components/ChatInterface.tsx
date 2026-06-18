@@ -110,7 +110,6 @@ export default function ChatInterface({
     }
   }, [activePartner, onChatActiveChange]);
 
-  const [showExitDialog, setShowExitDialog] = useState<boolean>(false);
   const [showThemeModal, setShowThemeModal] = useState<boolean>(false);
   const [activeMenuMessage, setActiveMenuMessage] = useState<ChatMessage | null>(null);
   const [showOptionsDropdown, setShowOptionsDropdown] = useState<boolean>(false);
@@ -118,52 +117,63 @@ export default function ChatInterface({
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Push dummy state to intercept back button
-    window.history.pushState(null, '', window.location.pathname);
-
-    const handlePopState = (e: PopStateEvent) => {
-      // Re-push state so user doesn't leave on next back press
-      window.history.pushState(null, '', window.location.pathname);
-      let handled = false;
-
+    const handleHardwareBack = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (dropdownOpenRef.current) {
+        closeDropdownWithHistory();
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
       if (activeMenuMessage) {
         setActiveMenuMessage(null);
-        handled = true;
-      } else if (showReportDialog) {
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (showReportDialog) {
         setShowReportDialog(false);
-        handled = true;
-      } else if (showThemeModal) {
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (showThemeModal) {
         setShowThemeModal(false);
-        handled = true;
-      } else if (inspectedPeer) {
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (inspectedPeer) {
         setInspectedPeer(null);
-        handled = true;
-      } else if (dropdownOpenRef.current) {
-        setShowOptionsDropdown(false);
-        handled = true;
-      } else if (chatState === 'matched' || chatState === 'direct') {
+        setIsAdminEditing(false);
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
+      }
+      if (chatState !== 'idle') {
         handleExitChat();
         setSidebarTab('people');
-        fetchSideData();
-        handled = true;
-      } else if (sidebarTab !== 'people') {
-        setSidebarTab('people');
-        handled = true;
-      } else {
-        setShowExitDialog(true);
-        handled = true;
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
+        return;
       }
-
-      if (handled) {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
+      if (activePartner && sidebarTab === 'chat') {
+        setActivePartner(null);
+        if (customEvent && customEvent.detail) {
+          customEvent.detail.handled = true;
+        }
       }
     };
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [chatState, inspectedPeer, showThemeModal, showReportDialog, activeMenuMessage, sidebarTab, setShowExitDialog]);
+    window.addEventListener('app_hardware_back', handleHardwareBack);
+    return () => window.removeEventListener('app_hardware_back', handleHardwareBack);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer]);
   const [callHistory, setCallHistory] = useState([
     { id: 1, peerName: 'Sarah Jenkins', peerPic: '', type: 'Video', direction: 'incoming', time: 'Today, 2:14 PM', duration: '12m 4s' },
     { id: 2, peerName: 'David Chen', peerPic: '', type: 'Audio', direction: 'outgoing', time: 'Yesterday, 6:30 PM', duration: '5m 18s' },
@@ -533,6 +543,7 @@ export default function ChatInterface({
   const [isMatchingLoading, setIsMatchingLoading] = useState<boolean>(false);
   const [showMatchErrorPopup, setShowMatchErrorPopup] = useState<boolean>(false);
   const matchSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingMatchRef = useRef<boolean>(false);
 
   // City/State normalization mapping
   const cityNormalizationMap: Record<string, string> = {
@@ -585,6 +596,9 @@ export default function ChatInterface({
   const lastFetchTimeRef = useRef<number>(0);
 
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
+  const chatIsActive = chatState === 'matched' || chatState === 'direct';
+  const partnerOnline = activePartner?.online === true;
+  const shouldShowChatActiveBadge = partnerFocused && chatIsActive;
 
   // Fetch initial side views data and refresh when switching between People and Chat tabs
   useEffect(() => {
@@ -720,8 +734,10 @@ export default function ChatInterface({
             profilePic: data.peerPic,
             city: data.peerCity,
             state: data.peerState,
-            country: data.peerCountry
+            country: data.peerCountry,
+            online: true
           });
+          setPartnerFocused(false);
           setHistoryMessages([]);
           setChatState('matched');
           setIsMatchingLoading(false);
@@ -877,7 +893,8 @@ export default function ChatInterface({
           deliveryStatus: (msg.senderId === me.id ? (msg.read ? 'read' : 'delivered') : undefined) as 'delivered' | 'read' | undefined
         }));
         setHistoryMessages(normalized);
-        setActivePartner(peer as any);
+        setActivePartner({ ...(peer as any), online: (peer as any).online });
+        setPartnerFocused(false);
         setChatState('direct');
         setSystemAlert(null);
         setSidebarTab('chat');
@@ -899,8 +916,22 @@ export default function ChatInterface({
 
   // MATCH POOL CONSTRAINTS
   const handleStartMatching = () => {
-    if (!ws) {
-      setShowMatchErrorPopup(true);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      // If socket isn't ready, show searching UI and keep a pending flag so
+      // we start matchmaking automatically once the socket connects.
+      pendingMatchRef.current = true;
+      clearMatchSearchTimeout();
+      setIsMatchingLoading(true);
+      setShowMatchErrorPopup(false);
+      setChatState('searching');
+
+      // Start the existing timeout period so UX remains consistent.
+      matchSearchTimeoutRef.current = setTimeout(() => {
+        setIsMatchingLoading(false);
+        setShowNoMatchPopup(true);
+        setChatState('idle');
+        pendingMatchRef.current = false;
+      }, 60000);
       return;
     }
     if (isMatchingLoading || chatState === 'searching') return;
@@ -948,6 +979,27 @@ export default function ChatInterface({
     }, 60000);
   };
 
+  // If a pending match request was started while the socket was down,
+  // send the actual `match:start` event when the socket becomes available.
+  useEffect(() => {
+    if (!pendingMatchRef.current) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    // Build filters from current UI state and send match:start
+    const filters: any = {};
+    if (genderFilter !== 'None') filters.gender = genderFilter;
+    if (ageFilter) filters.age = ageFilter;
+    if (cityFilter.trim()) filters.city = normalizeCity(cityFilter);
+    if (stateFilter.trim()) filters.state = normalizeState(stateFilter);
+
+    try {
+      ws.send(JSON.stringify({ event: 'match:start', data: { filters } }));
+      pendingMatchRef.current = false;
+    } catch (err) {
+      console.error('Failed to send pending match:start after reconnect', err);
+    }
+  }, [ws, genderFilter, ageFilter, cityFilter, stateFilter]);
+
   const handleCancelMatching = () => {
     setIsMatchingLoading(false);
     clearMatchSearchTimeout();
@@ -977,6 +1029,7 @@ export default function ChatInterface({
     }
     setChatState('idle');
     setActivePartner(null);
+    setPartnerFocused(false);
     setHistoryMessages([]);
   };
 
@@ -1821,7 +1874,7 @@ export default function ChatInterface({
                     className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0 aspect-square rounded-full object-cover border border-violet-500/30"
                     referrerPolicy="no-referrer"
                   />
-                  <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${activePartner?.online ? 'bg-emerald-500' : 'bg-rose-500'}`} title={activePartner?.online ? 'Online' : 'Offline'}></span>
+                  <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${partnerOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={partnerOnline ? 'Online' : 'Offline'}></span>
                 </div>
  
                 <div className="min-w-0 flex flex-col gap-1.5">
@@ -1836,10 +1889,10 @@ export default function ChatInterface({
                   </div>
                   
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${activePartner?.online ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {activePartner?.online ? '● ONLINE' : '● OFFLINE'}
+                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${partnerOnline ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {partnerOnline ? '● ONLINE' : '● OFFLINE'}
                     </span>
-                    {partnerFocused && activePartner?.online && (
+                    {shouldShowChatActiveBadge && (
                       <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold rounded-full tracking-wider uppercase">
                         Chat Active
                       </span>
@@ -1967,34 +2020,10 @@ export default function ChatInterface({
               )}
             </div>
           </div>
-
-          {/* EXIT DIALOG */}
-          {showExitDialog && (
-            <div className="fixed inset-0 bg-slate-950/80 z-[300] flex items-center justify-center p-6">
-              <div className={`p-6 rounded-2xl w-full max-w-sm border ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
-            <h4 className={`font-bold font-display text-base mb-2 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Are you sure you want to quit?</h4>
-            <p className={`text-xs mb-6 leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>You are about to exit the application.</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowExitDialog(false)}
-                    className={`flex-1 py-3 rounded-xl transition font-bold text-xs ${theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-700" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`}
-                  >
-                    NO, STAY
-                  </button>
-                  <button
-                    onClick={() => { setShowExitDialog(false); window.location.href = '/'; }}
-                    className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition font-bold text-xs"
-                  >
-                    YES, QUIT
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
           
           {/* REPORT OVERLAY DIALOG */}
           {showReportDialog && (
-            <div className="fixed inset-0 bg-slate-950/80 z-30 flex items-center justify-center p-4 animate-fade-in">
+            <div className="fixed inset-0 bg-slate-950/80 z-30 flex items-center justify-center p-4 overflow-hidden animate-fade-in">
               <div className={`p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] overflow-y-auto flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
                 <h4 className={`font-bold font-display text-base mb-2 shrink-0 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>File Abuse Complaint</h4>
                 <p className={`text-xs mb-4 leading-relaxed shrink-0 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
@@ -2229,7 +2258,7 @@ export default function ChatInterface({
                 <span className="text-4xl">🔍</span>
                 <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>No users found</h4>
                 <p className="text-[11px] text-slate-500 max-w-xs">
-                  We searched the live matching pool but could not find a compatible partner right now. Try again or broaden your filters.
+                  No users found. Please try again later.
                 </p>
                 <button
                   type="button"
@@ -2538,8 +2567,8 @@ export default function ChatInterface({
 
       {/* INSPECTED PEER DETAIL MODAL POPUP DISPLAY CARD */}
       {inspectedPeer && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in text-slate-100">
-          <div className={`w-full max-w-sm max-h-[calc(100vh-5rem)] border rounded-3xl p-6 relative overflow-hidden shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
+          <div className={`w-full max-w-sm max-h-[calc(100vh-4rem)] border rounded-3xl p-6 relative overflow-y-auto shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
             <button
               onClick={() => {
                 setInspectedPeer(null);
@@ -2813,8 +2842,8 @@ export default function ChatInterface({
 
       {/* THEME AND WALLPAPER CUSTOMIZATION MODAL */}
       {showThemeModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in text-slate-100">
-          <div className={`w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 ${
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
+          <div className={`w-full max-w-xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
@@ -2898,11 +2927,11 @@ export default function ChatInterface({
       {/* FLOATING ACTION INTERACTION OPTIONS MODAL CARD */}
       {activeMenuMessage && (
         <div 
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[250] flex items-center justify-center p-4 animate-fade-in text-slate-100"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[250] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100"
           onClick={() => setActiveMenuMessage(null)}
         >
           <div 
-            className={`w-full max-w-xs border rounded-3xl p-5 relative overflow-hidden shadow-2xl ${
+            className={`w-full max-w-xs border rounded-3xl p-5 relative overflow-y-auto max-h-[80vh] shadow-2xl ${
               theme === "light" 
                 ? "bg-white border-slate-200 text-slate-900 shadow-slate-300" 
                 : "bg-slate-900 border-slate-800 text-white shadow-black/80"

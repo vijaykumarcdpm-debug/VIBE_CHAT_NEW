@@ -463,11 +463,6 @@ export default function App() {
         return;
       }
 
-      if (window.sessionStorage.getItem('vibe_back_handled') === 'true') {
-        window.sessionStorage.removeItem('vibe_back_handled');
-        return;
-      }
-
       window.history.pushState({ vibe_app: true }, "");
 
       if (showThemeModal) {
@@ -1311,8 +1306,8 @@ export default function App() {
       )}
 
       {activeCall && (
-        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-4xl">
+        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4 overflow-hidden">
+          <div className="w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-y-auto">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -1328,7 +1323,7 @@ export default function App() {
       )}
 
       {incomingCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-hidden">
           <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
             <div className="relative mx-auto w-16 h-16">
               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
@@ -1374,7 +1369,7 @@ export default function App() {
       )}
 
       {outgoingCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-hidden">
           <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
             <div className="relative mx-auto w-16 h-16">
               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
@@ -1407,7 +1402,7 @@ export default function App() {
       )}
 
       {!rulesAgreed && me && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 overflow-hidden">
           <div className={`w-full max-w-md max-h-[95vh] overflow-y-auto scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/10 blur-xl rounded-full pointer-events-none"></div>
             
@@ -1448,8 +1443,8 @@ export default function App() {
       )}
 
       {adminChangesNotice && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[160] flex items-center justify-center p-4 animate-fade-in text-slate-100">
-          <div className={`w-full max-w-sm border rounded-3xl p-6 relative overflow-hidden shadow-2xl ${
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[160] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
+          <div className={`w-full max-w-sm max-h-[90vh] overflow-y-auto border rounded-3xl p-6 relative shadow-2xl ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-xl' : 'bg-slate-905 border-slate-800 text-slate-100 shadow-black/90'
           }`}>
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-500"></div>
@@ -1494,7 +1489,7 @@ export default function App() {
       )}
 
       {showOwnProfileModal && me && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-fade-in text-slate-100">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
           <div className={`w-full max-w-lg max-h-[95vh] overflow-y-auto scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
@@ -2074,7 +2069,7 @@ export default function App() {
       </div>
 
       {showExitConfirm && (
-        <div className={`fixed inset-0 backdrop-blur-md z-[200] flex items-center justify-center p-4 text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
+        <div className={`fixed inset-0 backdrop-blur-md z-[200] flex items-center justify-center p-4 text-center animate-fade-in overflow-hidden ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
           <div className={`p-8 border rounded-3xl max-w-sm w-full space-y-6 shadow-2xl relative overflow-hidden ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
             <div className="text-4xl mb-2">🚪</div>
             <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
