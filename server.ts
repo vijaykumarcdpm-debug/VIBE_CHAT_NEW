@@ -230,6 +230,19 @@ function sendWSMessage(userId: string, event: string, data: any) {
   }
 }
 
+function broadcastPresence(userId: string, online: boolean) {
+  const payload = JSON.stringify({
+    event: 'chat:presence',
+    data: { userId, online }
+  });
+
+  for (const [_, client] of ACTIVE_CONNECTIONS) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  }
+}
+
 // ---------------------------------------------------------
 // JWT Authentication Middlware
 // ---------------------------------------------------------
@@ -1476,6 +1489,7 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
 
   // Synchronously update everyone on connection changes
   broadcastToAll('stats:update', getLiveStats());
+  broadcastPresence(userId, true);
 
   ws.on('message', (messageRaw: string) => {
     try {
@@ -1750,6 +1764,7 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
 
     dbManager.updateUser(userId, { online: false, lastSeenAt: new Date().toISOString() });
     ACTIVE_CONNECTIONS.delete(userId);
+    broadcastPresence(userId, false);
     MATCHING_QUEUE = MATCHING_QUEUE.filter(c => c.userId !== userId);
     
     // Clear ongoing active calls involving this client

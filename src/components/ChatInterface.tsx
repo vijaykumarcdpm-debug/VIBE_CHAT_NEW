@@ -115,65 +115,6 @@ export default function ChatInterface({
   const [showOptionsDropdown, setShowOptionsDropdown] = useState<boolean>(false);
   const [showReportDialog, setShowReportDialog] = useState<boolean>(false);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleHardwareBack = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (dropdownOpenRef.current) {
-        closeDropdownWithHistory();
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-        return;
-      }
-      if (activeMenuMessage) {
-        setActiveMenuMessage(null);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-        return;
-      }
-      if (showReportDialog) {
-        setShowReportDialog(false);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-        return;
-      }
-      if (showThemeModal) {
-        setShowThemeModal(false);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-        return;
-      }
-      if (inspectedPeer) {
-        setInspectedPeer(null);
-        setIsAdminEditing(false);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-        return;
-      }
-      if (chatState !== 'idle') {
-        handleExitChat();
-        setSidebarTab('people');
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-        return;
-      }
-      if (activePartner && sidebarTab === 'chat') {
-        setActivePartner(null);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
-      }
-    };
-    window.addEventListener('app_hardware_back', handleHardwareBack);
-    return () => window.removeEventListener('app_hardware_back', handleHardwareBack);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer]);
   const [callHistory, setCallHistory] = useState([
     { id: 1, peerName: 'Sarah Jenkins', peerPic: '', type: 'Video', direction: 'incoming', time: 'Today, 2:14 PM', duration: '12m 4s' },
     { id: 2, peerName: 'David Chen', peerPic: '', type: 'Audio', direction: 'outgoing', time: 'Yesterday, 6:30 PM', duration: '5m 18s' },
@@ -597,8 +538,26 @@ export default function ChatInterface({
 
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
   const chatIsActive = chatState === 'matched' || chatState === 'direct';
-  const partnerOnline = activePartner?.online === true;
-  const shouldShowChatActiveBadge = partnerFocused && chatIsActive;
+  const partnerOnline = Boolean(
+    activePartner?.online === true ||
+    (activePartner && onlineUsers.some((u) => u.id === activePartner.id && u.online === true))
+  );
+  const partnerInSameConversation = Boolean(activePartner && partnerFocused);
+  const partnerStatusDotClass = partnerInSameConversation
+    ? 'bg-amber-400'
+    : partnerOnline
+      ? 'bg-emerald-500'
+      : 'bg-rose-500';
+  const partnerStatusTextClass = partnerInSameConversation
+    ? 'text-amber-400'
+    : partnerOnline
+      ? 'text-emerald-500'
+      : 'text-rose-500';
+  const partnerStatusLabel = partnerInSameConversation
+    ? '🟡 ONLINE'
+    : partnerOnline
+      ? '● ONLINE'
+      : '● OFFLINE';
 
   // Fetch initial side views data and refresh when switching between People and Chat tabs
   useEffect(() => {
@@ -611,61 +570,90 @@ export default function ChatInterface({
   useEffect(() => {
     const handleHardwareBack = (e: Event) => {
       const customEvent = e as CustomEvent;
-      if (dropdownOpenRef.current) {
-        closeDropdownWithHistory();
+      const markBackHandled = () => {
         if (customEvent && customEvent.detail) {
           customEvent.detail.handled = true;
         }
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
+      };
+
+      if (dropdownOpenRef.current) {
+        closeDropdownWithHistory();
+        markBackHandled();
+        return;
+      }
+
+      if (fullScreenImage) {
+        setFullScreenImage(null);
+        markBackHandled();
+        return;
+      }
+      if (dropdownOpenRef.current) {
+        closeDropdownWithHistory();
+        markBackHandled();
+        return;
+      }
+      if (showGalleryMenu) {
+        setShowGalleryMenu(false);
+        markBackHandled();
+        return;
+      }
+      if (showEmojiPicker) {
+        setShowEmojiPicker(false);
+        markBackHandled();
         return;
       }
       if (activeMenuMessage) {
         setActiveMenuMessage(null);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
+        markBackHandled();
+        return;
+      }
+      if (showNoMatchPopup) {
+        setShowNoMatchPopup(false);
+        markBackHandled();
+        return;
+      }
+      if (showNoOnlineUsersPopup) {
+        setShowNoOnlineUsersPopup(false);
+        markBackHandled();
+        return;
+      }
+      if (showMatchErrorPopup) {
+        setShowMatchErrorPopup(false);
+        markBackHandled();
         return;
       }
       if (showReportDialog) {
         setShowReportDialog(false);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
+        markBackHandled();
         return;
       }
       if (showThemeModal) {
         setShowThemeModal(false);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
+        markBackHandled();
         return;
       }
       if (inspectedPeer) {
         setInspectedPeer(null);
         setIsAdminEditing(false);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
+        markBackHandled();
         return;
       }
       if (chatState !== 'idle') {
         handleExitChat();
         setSidebarTab('people');
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
+        markBackHandled();
         return;
       }
       if (activePartner && sidebarTab === 'chat') {
         setActivePartner(null);
-        if (customEvent && customEvent.detail) {
-          customEvent.detail.handled = true;
-        }
+        markBackHandled();
       }
     };
     window.addEventListener('app_hardware_back', handleHardwareBack);
     return () => window.removeEventListener('app_hardware_back', handleHardwareBack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer]);
+  }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer, fullScreenImage, showGalleryMenu, showEmojiPicker, showNoMatchPopup, showNoOnlineUsersPopup, showMatchErrorPopup]);
 
   const fetchSideData = async () => {
     if (!mountedRef.current) return;
@@ -798,11 +786,23 @@ export default function ChatInterface({
             setPeerTyping(!!data.typing);
           }
         } else if (event === 'chat:presence') {
-          if (activePartner && activePartner.id === data.userId) {
+          if (activePartner && activePartner.id === data.userId && data.focusing !== undefined) {
             setPartnerFocused(!!data.focusing);
-            if (data.online !== undefined) {
-              setActivePartner(prev => prev ? { ...prev, online: !!data.online } : prev);
-            }
+          }
+          if (activePartner && activePartner.id === data.userId && data.online !== undefined) {
+            setActivePartner(prev => prev ? { ...prev, online: !!data.online } : prev);
+          }
+          if (data.online !== undefined) {
+            setOnlineUsers(prev => {
+              const hadUser = prev.some((u) => u.id === data.userId);
+              if (hadUser) {
+                return prev.map((u) => u.id === data.userId ? { ...u, online: !!data.online } : u);
+              }
+              if (data.online) {
+                return [...prev, { id: data.userId, online: true } as any];
+              }
+              return prev;
+            });
           }
         } else if (event === 'chat:delete_message') {
           setHistoryMessages(prev => prev.filter(m => m.id !== data.messageId));
@@ -893,7 +893,8 @@ export default function ChatInterface({
           deliveryStatus: (msg.senderId === me.id ? (msg.read ? 'read' : 'delivered') : undefined) as 'delivered' | 'read' | undefined
         }));
         setHistoryMessages(normalized);
-        setActivePartner({ ...(peer as any), online: (peer as any).online });
+        const partnerIsOnline = onlineUsers.some((u) => u.id === peer.id);
+        setActivePartner({ ...(peer as any), online: (peer as any).online ?? partnerIsOnline });
         setPartnerFocused(false);
         setChatState('direct');
         setSystemAlert(null);
@@ -949,14 +950,6 @@ export default function ChatInterface({
     if (cityFilter.trim()) filters.city = normalizeCity(cityFilter);
     if (stateFilter.trim()) filters.state = normalizeState(stateFilter);
 
-    // Check if there are any online users at all (live data)
-    const onlineUsersCount = onlineUsers.length;
-    if (onlineUsersCount === 0) {
-      setIsMatchingLoading(false);
-      setShowNoOnlineUsersPopup(true);
-      return;
-    }
-
     // Ensure socket is open before sending
     try {
       if (ws.readyState !== WebSocket.OPEN) {
@@ -1002,7 +995,9 @@ export default function ChatInterface({
 
   const handleCancelMatching = () => {
     setIsMatchingLoading(false);
+    pendingMatchRef.current = false;
     clearMatchSearchTimeout();
+    setChatState('idle');
     if (!ws) return;
     try {
       if (ws.readyState === WebSocket.OPEN) {
@@ -1874,7 +1869,7 @@ export default function ChatInterface({
                     className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0 aspect-square rounded-full object-cover border border-violet-500/30"
                     referrerPolicy="no-referrer"
                   />
-                  <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${partnerOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} title={partnerOnline ? 'Online' : 'Offline'}></span>
+                  <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${partnerStatusDotClass}`} title={partnerInSameConversation ? 'Both users are active in this conversation' : partnerOnline ? 'Online' : 'Offline'}></span>
                 </div>
  
                 <div className="min-w-0 flex flex-col gap-1.5">
@@ -1889,15 +1884,9 @@ export default function ChatInterface({
                   </div>
                   
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${partnerOnline ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {partnerOnline ? '● ONLINE' : '● OFFLINE'}
+                    <span className={`font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 ${partnerStatusTextClass}`}>
+                      {partnerStatusLabel}
                     </span>
-                    {shouldShowChatActiveBadge && (
-                      <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold rounded-full tracking-wider uppercase">
-                        Chat Active
-                      </span>
-                    )}
-
                     {activePartner?.type === 'Royal VIP' && (
                       <span className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-500 text-[10px] font-extrabold rounded-full tracking-wider uppercase">👑 VIP Badge</span>
                     )}
@@ -2359,7 +2348,7 @@ export default function ChatInterface({
                       {displayedContent && <div className="break-words whitespace-pre-wrap">{displayedContent}</div>}
 
                       {m.mediaUrl && m.type === 'image' && (
-                        <img src={m.mediaUrl} alt="attachment" className="max-w-[200px] mt-1.5 rounded-lg border border-slate-700/30 w-full cursor-pointer" onClick={() => setFullScreenImage(m.mediaUrl || null)} />
+                        <img src={m.mediaUrl} alt="attachment" className="max-w-[200px] mt-1.5 rounded-lg border border-slate-700/30 w-full cursor-pointer" onClick={() => openModal(setFullScreenImage, m.mediaUrl || null)} />
                       )}
                       
                       {m.mediaUrl && m.type === 'voice' && (
@@ -3008,6 +2997,29 @@ export default function ChatInterface({
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* FULL SCREEN IMAGE VIEWER */}
+      {fullScreenImage && (
+        <div className="fixed inset-0 z-[280] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden animate-fade-in">
+          <div className="relative w-full max-w-3xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950">
+            <button
+              type="button"
+              onClick={() => setFullScreenImage(null)}
+              className="absolute top-4 right-4 z-20 p-3 rounded-2xl bg-slate-900/90 text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="h-full w-full overflow-hidden">
+              <img
+                src={fullScreenImage}
+                alt="Full screen attachment"
+                className="h-full w-full object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
         </div>
       )}

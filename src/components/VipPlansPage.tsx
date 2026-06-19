@@ -31,6 +31,17 @@ export default function VipPlansPage({
   const plansContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (selectedPlan) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedPlan]);
+
+  useEffect(() => {
     if (autoScrollToPlans && plansContainerRef.current) {
       setTimeout(() => {
         plansContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -287,11 +298,11 @@ export default function VipPlansPage({
 
       {/* Payment Popup Modal */}
       {selectedPlan && (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
-          <div className={`w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-3xl p-6 sm:p-8 shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
-            
-            {/* Modal Header */}
-            <div className="flex justify-between items-center mb-6">
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in overflow-hidden ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
+          <div className={`w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
+            <div className="h-full overflow-y-auto p-6 sm:p-8">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center mb-6">
                <h2 className={`text-2xl font-black font-display tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
                   Complete VIP Enrollment
                </h2>
