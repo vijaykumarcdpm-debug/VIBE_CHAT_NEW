@@ -312,6 +312,7 @@ export default function VipPlansPage({
                >
                   <X className="w-6 h-6" />
                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -425,7 +426,6 @@ export default function VipPlansPage({
           </div>
         </div>
       )}
-
     </div>
-  );
+  )
 }
