@@ -42,6 +42,24 @@ export default function VipPlansPage({
   }, [selectedPlan]);
 
   useEffect(() => {
+    function handleAppHardwareBack(evt: any) {
+      if (selectedPlan) {
+        setSelectedPlan(null);
+        setScreenshot('');
+        setScreenshotName('');
+        setUploadError('');
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        if (evt && typeof evt === 'object') {
+          try { evt.detail = evt.detail || {}; evt.detail.handled = true; } catch (e) {}
+        }
+      }
+    }
+
+    window.addEventListener('app_hardware_back', handleAppHardwareBack as EventListener);
+    return () => window.removeEventListener('app_hardware_back', handleAppHardwareBack as EventListener);
+  }, [selectedPlan]);
+
+  useEffect(() => {
     if (autoScrollToPlans && plansContainerRef.current) {
       setTimeout(() => {
         plansContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -265,7 +283,7 @@ export default function VipPlansPage({
                   return (
                     <button
                       key={pl.id}
-                      onClick={() => { setSelectedPlan(pl); setSubmissionSuccess(false); }}
+                      onClick={() => { try { window.history.pushState({ modalOpen: true }, ""); } catch (e) {} setSelectedPlan(pl); setSubmissionSuccess(false); }}
                       className={`plan-duration-card plan-duration-card-bg text-left p-4 rounded-2xl border-2 transition relative duration-200 cursor-pointer ${
                         isSelected
                           ? 'border-black scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.15)]'

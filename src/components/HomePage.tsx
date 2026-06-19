@@ -138,6 +138,21 @@ export default function HomePage({
   const [regEmail, setRegEmail] = useState<string>('');
   const [regPass, setRegPass] = useState<string>('');
   const [regConfirmPass, setRegConfirmPass] = useState<string>('');
+
+  useEffect(() => {
+    function handleAppHardwareBack(evt: any) {
+      if (authView && authView !== 'none') {
+        setAuthView('none');
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        if (evt && typeof evt === 'object') {
+          try { evt.detail = evt.detail || {}; evt.detail.handled = true; } catch (e) {}
+        }
+      }
+    }
+
+    window.addEventListener('app_hardware_back', handleAppHardwareBack as EventListener);
+    return () => window.removeEventListener('app_hardware_back', handleAppHardwareBack as EventListener);
+  }, [authView]);
   const [regAge, setRegAge] = useState<string>('');
   const [regGender, setRegGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [regDob, setRegDob] = useState<string>('');
@@ -393,7 +408,7 @@ export default function HomePage({
             </button>
 
             <button
-              onClick={() => { setAuthView('login'); setErrorMessage(''); }}
+              onClick={() => { try { window.history.pushState({ modalOpen: true }, ""); } catch (e) {} setAuthView('login'); setErrorMessage(''); }}
               className={`px-2 py-1.5 sm:px-4 sm:py-2 border rounded-xl text-[10px] sm:text-xs font-semibold transition cursor-pointer ${
                 theme === 'light'
                   ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
@@ -547,9 +562,7 @@ export default function HomePage({
                   <div className="grid grid-cols-1 gap-5 pt-4">
                     {/* Guest access card gateway */}
                     <div 
-                      onClick={() => { 
-                        setAuthView('guest'); setErrorMessage(''); 
-                      }}
+                      onClick={() => { try { window.history.pushState({ modalOpen: true }, ""); } catch (e) {} setAuthView('guest'); setErrorMessage(''); }}
                       className={`group p-6 sm:p-7 rounded-3xl border-2 transition-all duration-300 cursor-pointer flex items-center gap-5 sm:gap-6 hover:scale-[1.02] active:scale-[0.98] shadow-xl hover:shadow-2xl ${
                         theme === 'light'
                           ? 'bg-gradient-to-br from-indigo-50/80 via-white to-blue-50/50 border-indigo-200/60 hover:border-indigo-400 shadow-indigo-500/10'
@@ -572,9 +585,7 @@ export default function HomePage({
 
                     {/* Login account card gateway */}
                     <div 
-                      onClick={() => { 
-                        setAuthView('login'); setErrorMessage(''); 
-                      }}
+                      onClick={() => { try { window.history.pushState({ modalOpen: true }, ""); } catch (e) {} setAuthView('login'); setErrorMessage(''); }}
                       className={`group p-6 sm:p-7 rounded-3xl border-2 transition-all duration-300 cursor-pointer flex items-center gap-5 sm:gap-6 hover:scale-[1.02] active:scale-[0.98] shadow-xl hover:shadow-2xl ${
                         theme === 'light'
                           ? 'bg-gradient-to-br from-blue-50/80 via-white to-sky-50/50 border-blue-200/60 hover:border-blue-400 shadow-blue-500/10'
@@ -597,7 +608,7 @@ export default function HomePage({
 
                     {/* Register account card gateway */}
                     <div 
-                      onClick={() => { setAuthView('register'); setErrorMessage(''); }}
+                      onClick={() => { try { window.history.pushState({ modalOpen: true }, ""); } catch (e) {} setAuthView('register'); setErrorMessage(''); }}
                       className={`group p-6 sm:p-7 rounded-3xl border-2 transition-all duration-300 cursor-pointer flex items-center gap-5 sm:gap-6 hover:scale-[1.02] active:scale-[0.98] shadow-xl hover:shadow-2xl ${
                         theme === 'light'
                           ? 'bg-gradient-to-br from-cyan-50/80 via-white to-emerald-50/50 border-cyan-200/60 hover:border-cyan-400 shadow-cyan-500/10'

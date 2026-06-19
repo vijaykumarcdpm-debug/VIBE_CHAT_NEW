@@ -967,6 +967,17 @@ export default function App() {
             type: data.type,
             breakthrough: data.breakthrough
           });
+        } else if (event === 'match:call_start') {
+          setActiveCall({
+            peerId: data.peerId,
+            peerName: data.peerName,
+            peerPic: data.peerPic,
+            isCaller: !!data.isCaller,
+            type: data.type || 'audio'
+          });
+          setIncomingCall(null);
+          setOutgoingCall(null);
+          showToast('Match found! Starting call...');
         } else if (event === 'call:response') {
           setOutgoingCall((prevOrig) => {
             if (data.accepted && prevOrig) {

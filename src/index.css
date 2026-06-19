@@ -53,3 +53,40 @@
 .plan-duration-card-bg {
   background-color: #ffffff !important;
 }
+
+/* Responsive modal fixes for mobile:
+   - Align overlays to top on small screens so headers/close buttons remain visible
+   - Allow overlay scrolling and make modal content use dynamic viewport height (dvh)
+   - Ensure inner modal containers are scrollable and use touch-friendly scrolling
+*/
+@media (max-width: 640px) {
+  .fixed.inset-0.overflow-hidden {
+    align-items: flex-start;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    overflow-y: auto; /* allow the overlay to scroll when content is taller */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Immediate child modal card: make it never exceed the dynamic viewport height */
+  .fixed.inset-0.overflow-hidden > * {
+    max-height: calc(100dvh - 2rem) !important;
+    height: auto !important;
+    margin-left: auto;
+    margin-right: auto;
+    overflow: hidden;
+  }
+
+  /* Ensure the modal's internal scroll container is enabled */
+  .fixed.inset-0.overflow-hidden > *[class*="overflow-y-auto"],
+  .fixed.inset-0.overflow-hidden > * > *[class*="overflow-y-auto"] {
+    max-height: calc(100dvh - 3rem) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Keep the close button visible by ensuring some top spacing inside the overlay */
+  .fixed.inset-0.overflow-hidden button[class*="top-"] {
+    z-index: 60;
+  }
+}

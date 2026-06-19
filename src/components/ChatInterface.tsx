@@ -480,6 +480,7 @@ export default function ChatInterface({
   const [cityFilter, setCityFilter] = useState<string>('');
   const [stateFilter, setStateFilter] = useState<string>('');
   const [showNoMatchPopup, setShowNoMatchPopup] = useState<boolean>(false);
+  const [matchNotice, setMatchNotice] = useState<string>('No users found. Please try again later.');
   const [showNoOnlineUsersPopup, setShowNoOnlineUsersPopup] = useState<boolean>(false);
   const [isMatchingLoading, setIsMatchingLoading] = useState<boolean>(false);
   const [showMatchErrorPopup, setShowMatchErrorPopup] = useState<boolean>(false);
@@ -538,9 +539,10 @@ export default function ChatInterface({
 
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
   const chatIsActive = chatState === 'matched' || chatState === 'direct';
+  const isUserOnline = (userId?: string) => Boolean(userId && onlineUsers.some((u) => u.id === userId && u.online === true));
   const partnerOnline = Boolean(
     activePartner?.online === true ||
-    (activePartner && onlineUsers.some((u) => u.id === activePartner.id && u.online === true))
+    isUserOnline(activePartner?.id)
   );
   const partnerInSameConversation = Boolean(activePartner && partnerFocused);
   const partnerStatusDotClass = partnerInSameConversation
@@ -558,6 +560,11 @@ export default function ChatInterface({
     : partnerOnline
       ? '● ONLINE'
       : '● OFFLINE';
+  const inspectedIsOnline = Boolean(
+    inspectedFullDetails?.online === true ||
+    inspectedPeer?.online === true ||
+    isUserOnline(inspectedPeer?.id)
+  );
 
   // Fetch initial side views data and refresh when switching between People and Chat tabs
   useEffect(() => {
@@ -655,12 +662,12 @@ export default function ChatInterface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer, fullScreenImage, showGalleryMenu, showEmojiPicker, showNoMatchPopup, showNoOnlineUsersPopup, showMatchErrorPopup]);
 
-  const fetchSideData = async () => {
+  const fetchSideData = async (force: boolean = false) => {
     if (!mountedRef.current) return;
     
     // Debounce: max once per second to prevent rapid repeated calls
     const now = Date.now();
-    if (now - lastFetchTimeRef.current < 1000) return;
+    if (!force && now - lastFetchTimeRef.current < 1000) return;
     lastFetchTimeRef.current = now;
 
     try {
@@ -732,6 +739,12 @@ export default function ChatInterface({
           setShowNoMatchPopup(false);
           setShowNoOnlineUsersPopup(false);
           setShowMatchErrorPopup(false);
+        } else if (event === 'match:none') {
+          clearMatchSearchTimeout();
+          setMatchNotice(data?.message || 'No users are currently available.');
+          setShowNoMatchPopup(true);
+          setIsMatchingLoading(false);
+          setChatState('idle');
         } else if (event === 'chat:message') {
           // Message received from stranger/friend
           const incomingMsg: ChatMessage = data;
@@ -768,7 +781,7 @@ export default function ChatInterface({
             return m;
           }));
         } else if (event === 'chat:read') {
-          const { messageIds } = data;
+          const { messageIds, peerId } = data;
           if (Array.isArray(messageIds) && messageIds.length > 0) {
             setHistoryMessages(prev => prev.map(m => {
               if (messageIds.includes(m.id)) {
@@ -780,6 +793,9 @@ export default function ChatInterface({
               }
               return m;
             }));
+          }
+          if (peerId) {
+            setRecents(prev => prev.map(r => r.peerId === peerId ? { ...r, unreadCount: 0 } : r));
           }
         } else if (event === 'chat:typing') {
           if (activePartner && activePartner.id === data.senderId) {
@@ -901,7 +917,7 @@ export default function ChatInterface({
         setSidebarTab('chat');
         // Immediately clear unread indicator for this peer
         setRecents(prev => prev.map(r => r.peerId === peer.id ? { ...r, unreadCount: 0 } : r));
-        fetchSideData(); // sync with server
+        await fetchSideData(true); // force server sync so unread badge resets immediately
       } else {
         const errData = await res.json();
         if (errData.isLocked) {
@@ -918,15 +934,12 @@ export default function ChatInterface({
   // MATCH POOL CONSTRAINTS
   const handleStartMatching = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      // If socket isn't ready, show searching UI and keep a pending flag so
-      // we start matchmaking automatically once the socket connects.
       pendingMatchRef.current = true;
       clearMatchSearchTimeout();
       setIsMatchingLoading(true);
       setShowMatchErrorPopup(false);
       setChatState('searching');
 
-      // Start the existing timeout period so UX remains consistent.
       matchSearchTimeoutRef.current = setTimeout(() => {
         setIsMatchingLoading(false);
         setShowNoMatchPopup(true);
@@ -943,6 +956,8 @@ export default function ChatInterface({
 
     clearMatchSearchTimeout();
     setIsMatchingLoading(true);
+    setShowNoMatchPopup(false);
+    setShowMatchErrorPopup(false);
 
     const filters: any = {};
     if (genderFilter !== 'None') filters.gender = genderFilter;
@@ -950,7 +965,8 @@ export default function ChatInterface({
     if (cityFilter.trim()) filters.city = normalizeCity(cityFilter);
     if (stateFilter.trim()) filters.state = normalizeState(stateFilter);
 
-    // Ensure socket is open before sending
+    localStorage.setItem('vibechat_last_match_filters', JSON.stringify(filters));
+
     try {
       if (ws.readyState !== WebSocket.OPEN) {
         throw new Error('socket-not-open');
@@ -1539,26 +1555,29 @@ export default function ChatInterface({
                             })}
                             className="flex items-center gap-4 min-w-0 flex-grow text-left cursor-pointer"
                           >
-                            <img 
-                              src={rc.peerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23666'/></svg>`} 
-                              alt={rc.peerName} 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setInspectedPeer({
-                                  id: rc.peerId,
-                                  username: rc.peerName,
-                                  gender: rc.peerGender,
-                                  type: rc.peerType,
-                                  profilePic: rc.peerPic,
-                                  city: rc.peerCity,
-                                  state: rc.peerState,
-                                  country: rc.peerCountry
-                                });
-                              }}
-                              className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 aspect-square rounded-full object-cover border border-violet-500/10 hover:ring-2 hover:ring-violet-500 transition duration-150" 
-                              referrerPolicy="no-referrer"
-                              title="Click to view detailed profile info"
-                            />
+                            <div className="relative">
+                              <img 
+                                src={rc.peerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23666'/></svg>`} 
+                                alt={rc.peerName} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedPeer({
+                                    id: rc.peerId,
+                                    username: rc.peerName,
+                                    gender: rc.peerGender,
+                                    type: rc.peerType,
+                                    profilePic: rc.peerPic,
+                                    city: rc.peerCity,
+                                    state: rc.peerState,
+                                    country: rc.peerCountry
+                                  });
+                                }}
+                                className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 aspect-square rounded-full object-cover border border-violet-500/10 hover:ring-2 hover:ring-violet-500 transition duration-150" 
+                                referrerPolicy="no-referrer"
+                                title="Click to view detailed profile info"
+                              />
+                              <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full ${activePartner?.id === rc.peerId ? (partnerOnline ? 'bg-emerald-500' : 'bg-rose-500') : (isUserOnline(rc.peerId) ? 'bg-emerald-500' : 'bg-rose-500')}`} title={activePartner?.id === rc.peerId ? (partnerOnline ? 'Online' : 'Offline') : (isUserOnline(rc.peerId) ? 'Online' : 'Offline')}></span>
+                            </div>
                             <div className="min-w-0 flex flex-col gap-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className={`text-base font-bold max-w-[200px] truncate block ${
@@ -2247,7 +2266,7 @@ export default function ChatInterface({
                 <span className="text-4xl">🔍</span>
                 <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>No users found</h4>
                 <p className="text-[11px] text-slate-500 max-w-xs">
-                  No users found. Please try again later.
+                  {matchNotice}
                 </p>
                 <button
                   type="button"
@@ -2775,14 +2794,14 @@ export default function ChatInterface({
                     <span className="text-slate-500">Last Seen</span>
                     <span className={`font-bold ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
                       {inspectedFullDetails?.lastSeenAt 
-                        ? formatLastSeen(inspectedFullDetails.lastSeenAt, inspectedFullDetails?.online)
+                        ? formatLastSeen(inspectedFullDetails.lastSeenAt, inspectedIsOnline)
                         : 'Recently'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Online</span>
-                    <span className={`font-bold ${inspectedFullDetails?.online ? 'text-emerald-500' : 'text-slate-200'}`}>
-                      {inspectedFullDetails?.online ? 'Active Now' : 'Offline'}
+                    <span className={`font-bold ${inspectedIsOnline ? 'text-emerald-500' : 'text-slate-200'}`}>
+                      {inspectedIsOnline ? 'Active Now' : 'Offline'}
                     </span>
                   </div>
                 </div>

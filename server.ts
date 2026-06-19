@@ -119,64 +119,85 @@ function broadcastToAll(event: string, data: any) {
 function searchMatches() {
   if (MATCHING_QUEUE.length < 2) return;
 
-  const matchedIndices = new Set<number>();
+  let bestPair: { aIndex: number; bIndex: number; score: number } | null = null;
 
   for (let i = 0; i < MATCHING_QUEUE.length; i++) {
-    if (matchedIndices.has(i)) continue;
     const userA = MATCHING_QUEUE[i];
-
     for (let j = i + 1; j < MATCHING_QUEUE.length; j++) {
-      if (matchedIndices.has(j)) continue;
       const userB = MATCHING_QUEUE[j];
+      if (!checkUserFilters(userA, userB) || !checkUserFilters(userB, userA)) continue;
 
-      // Check filters
-      // Note: Admin, VIP ('Royal VIP') users have filter benefits. Guest/Registered might have restricted filters.
-      // If user A has filters:
-      const matchesFilterA = checkUserFilters(userA, userB);
-      // If user B has filters:
-      const matchesFilterB = checkUserFilters(userB, userA);
+      const score = calculateMatchPairScore(userA, userB);
+      if (score < 0) continue;
 
-      if (matchesFilterA && matchesFilterB) {
-        // MATCH MADE!
-        matchedIndices.add(i);
-        matchedIndices.add(j);
-
-        const profileA = dbManager.getUser(userA.userId);
-        const profileB = dbManager.getUser(userB.userId);
-
-        if (profileA && profileB) {
-          sendWSMessage(userA.userId, 'match:success', {
-            peerId: profileB.id,
-            peerName: profileB.username,
-            peerGender: profileB.gender,
-            peerType: profileB.type,
-            peerPic: profileB.profilePic,
-            peerCity: profileB.city,
-            peerState: profileB.state,
-            peerCountry: profileB.country
-          });
-
-          sendWSMessage(userB.userId, 'match:success', {
-            peerId: profileA.id,
-            peerName: profileA.username,
-            peerGender: profileA.gender,
-            peerType: profileA.type,
-            peerPic: profileA.profilePic,
-            peerCity: profileA.city,
-            peerState: profileA.state,
-            peerCountry: profileA.country
-          });
-        }
-        break;
+      if (!bestPair || score > bestPair.score) {
+        bestPair = { aIndex: i, bIndex: j, score };
       }
     }
   }
 
-  // Remove matched candidates from queue
-  if (matchedIndices.size > 0) {
-    MATCHING_QUEUE = MATCHING_QUEUE.filter((_, index) => !matchedIndices.has(index));
-    broadcastToAll('stats:update', getLiveStats());
+  if (!bestPair) return;
+
+  const { aIndex, bIndex } = bestPair;
+  const userA = MATCHING_QUEUE[aIndex];
+  const userB = MATCHING_QUEUE[bIndex];
+  const profileA = dbManager.getUser(userA.userId);
+  const profileB = dbManager.getUser(userB.userId);
+
+  if (profileA && profileB) {
+    const callerIsA = aIndex < bIndex;
+
+    sendWSMessage(userA.userId, 'match:success', {
+      peerId: profileB.id,
+      peerName: profileB.username,
+      peerGender: profileB.gender,
+      peerType: profileB.type,
+      peerPic: profileB.profilePic,
+      peerCity: profileB.city,
+      peerState: profileB.state,
+      peerCountry: profileB.country
+    });
+
+    sendWSMessage(userB.userId, 'match:success', {
+      peerId: profileA.id,
+      peerName: profileA.username,
+      peerGender: profileA.gender,
+      peerType: profileA.type,
+      peerPic: profileA.profilePic,
+      peerCity: profileA.city,
+      peerState: profileA.state,
+      peerCountry: profileA.country
+    });
+
+    sendWSMessage(userA.userId, 'match:call_start', {
+      peerId: profileB.id,
+      peerName: profileB.username,
+      peerPic: profileB.profilePic,
+      peerCity: profileB.city,
+      peerState: profileB.state,
+      peerCountry: profileB.country,
+      isCaller: callerIsA,
+      type: 'audio'
+    });
+
+    sendWSMessage(userB.userId, 'match:call_start', {
+      peerId: profileA.id,
+      peerName: profileA.username,
+      peerPic: profileA.profilePic,
+      peerCity: profileA.city,
+      peerState: profileA.state,
+      peerCountry: profileA.country,
+      isCaller: !callerIsA,
+      type: 'audio'
+    });
+
+    ACTIVE_CALLS.set(userA.userId, { peerId: userB.userId, type: 'audio' });
+    ACTIVE_CALLS.set(userB.userId, { peerId: userA.userId, type: 'audio' });
   }
+
+  const matchedIndices = new Set<number>([aIndex, bIndex]);
+  MATCHING_QUEUE = MATCHING_QUEUE.filter((_, index) => !matchedIndices.has(index));
+  broadcastToAll('stats:update', getLiveStats());
 }
 
 function normalizeText(value: string): string {
@@ -189,6 +210,40 @@ function matchAgeFilter(filter: string | undefined, targetAge: string): boolean 
   const age = parseInt(targetAge, 10);
   if (Number.isNaN(age)) return false;
   return age >= min && age <= max;
+}
+
+function calculateMatchPairScore(userA: MatchCandidate, userB: MatchCandidate): number {
+  let score = 0;
+
+  if (userA.filters.gender && normalizeText(userA.filters.gender) === normalizeText(userB.gender)) {
+    score += 100;
+  }
+  if (userB.filters.gender && normalizeText(userB.filters.gender) === normalizeText(userA.gender)) {
+    score += 100;
+  }
+
+  if (userA.filters.state && normalizeText(userA.filters.state) === normalizeText(userB.state)) {
+    score += 35;
+  }
+  if (userB.filters.state && normalizeText(userB.filters.state) === normalizeText(userA.state)) {
+    score += 35;
+  }
+
+  if (userA.filters.city && normalizeText(userA.filters.city) === normalizeText(userB.city)) {
+    score += 35;
+  }
+  if (userB.filters.city && normalizeText(userB.filters.city) === normalizeText(userA.city)) {
+    score += 35;
+  }
+
+  if (userA.filters.age && matchAgeFilter(userA.filters.age, userB.age !== undefined ? userB.age.toString() : '')) {
+    score += 20;
+  }
+  if (userB.filters.age && matchAgeFilter(userB.filters.age, userA.age !== undefined ? userA.age.toString() : '')) {
+    score += 20;
+  }
+
+  return score;
 }
 
 function checkUserFilters(user: MatchCandidate, target: MatchCandidate): boolean {
@@ -1024,10 +1079,10 @@ APP.get('/api/messages/:peerId', authenticateToken, (req: any, res) => {
     }
   }
 
-  const messages = dbManager.getMessagesBetween(senderId, recipientId);
   const readIds = dbManager.markMessagesRead(recipientId, senderId);
+  const messages = dbManager.getMessagesBetween(senderId, recipientId);
   if (readIds.length > 0) {
-    sendWSMessage(recipientId, 'chat:read', { messageIds: readIds });
+    sendWSMessage(recipientId, 'chat:read', { messageIds: readIds, peerId: senderId });
   }
   res.json(messages);
 });
@@ -1520,8 +1575,13 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
             filters: data?.filters || {}
           });
 
-          ws.send(JSON.stringify({ event: 'match:searching', data: {} }));
-          searchMatches();
+          if (MATCHING_QUEUE.length <= 1) {
+            ws.send(JSON.stringify({ event: 'match:none', data: { message: 'No users are currently available.' } }));
+            MATCHING_QUEUE = MATCHING_QUEUE.filter(c => c.userId !== userId);
+          } else {
+            ws.send(JSON.stringify({ event: 'match:searching', data: {} }));
+            searchMatches();
+          }
         }
       }
 
