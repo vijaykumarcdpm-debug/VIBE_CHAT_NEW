@@ -248,9 +248,9 @@ export default function ChatInterface({
     e.preventDefault();
     if (!inspectedPeer) return;
 
-    const bioWords = adminEditForm.bio.trim().split(/\s+/).filter(w => w.length > 0);
-    if (bioWords.length > 50) {
-      setAdminStatusMsg({ text: 'Bio cannot exceed 50 words.', isError: true });
+    const bioText = adminEditForm.bio.trim();
+    if (bioText.length > 50) {
+      setAdminStatusMsg({ text: 'Bio cannot exceed 50 characters.', isError: true });
       return;
     }
 
@@ -313,6 +313,26 @@ export default function ChatInterface({
   // Menus
   const [partnerFocused, setPartnerFocused] = useState<boolean>(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const highlightTimeoutRef = useRef<any>(null);
+
+  const scrollToMessage = (messageId?: string | null) => {
+    if (!messageId) return;
+    const target = messageRefs.current[messageId];
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedMessageId(messageId);
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 2200);
+  };
+
   const dropdownOpenRef = useRef<boolean>(false);
   useEffect(() => {
     dropdownOpenRef.current = showOptionsDropdown;
@@ -584,6 +604,27 @@ export default function ChatInterface({
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
   const chatIsActive = chatState === 'matched' || chatState === 'direct';
   const isUserOnline = (userId?: string) => Boolean(userId && onlineUsers.some((u) => u.id === userId && u.online === true));
+
+  const updateOnlineUserList = (userId: string, online: boolean, payload?: any) => {
+    setOnlineUsers(prev => {
+      if (!online) {
+        return prev.filter((u) => u.id !== userId);
+      }
+      const alreadyPresent = prev.some((u) => u.id === userId);
+      if (alreadyPresent) {
+        return prev.map((u) => u.id === userId ? { ...u, online: true, ...payload } : u);
+      }
+      return [...prev, { id: userId, online: true, ...payload } as any];
+    });
+  };
+
+  const clearUnreadForPeer = async (peerId: string, markOnServer: boolean = false) => {
+    setRecents(prev => prev.map(r => r.peerId === peerId ? { ...r, unreadCount: 0 } : r));
+    if (markOnServer && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ event: 'chat:mark_read', data: { peerId } }));
+    }
+  };
+
   const partnerOnline = Boolean(
     activePartner?.online === true ||
     isUserOnline(activePartner?.id)
@@ -798,7 +839,8 @@ export default function ChatInterface({
           
           // Verify if active dialog matches sender
           if (activePartner && activePartner.id === incomingMsg.senderId) {
-            setHistoryMessages(prev => [...prev, incomingMsg]);
+            setHistoryMessages(prev => [...prev, { ...incomingMsg, read: true }]);
+            clearUnreadForPeer(incomingMsg.senderId, true);
           } else {
             // Re-fetch side list to indicate unread count
             fetchSideData();
@@ -856,15 +898,11 @@ export default function ChatInterface({
             setActivePartner(prev => prev ? { ...prev, online: !!data.online } : prev);
           }
           if (data.online !== undefined) {
-            setOnlineUsers(prev => {
-              const hadUser = prev.some((u) => u.id === data.userId);
-              if (hadUser) {
-                return prev.map((u) => u.id === data.userId ? { ...u, online: !!data.online } : u);
-              }
-              if (data.online) {
-                return [...prev, { id: data.userId, online: true } as any];
-              }
-              return prev;
+            updateOnlineUserList(data.userId, !!data.online, {
+              username: data.username,
+              type: data.type,
+              profilePic: data.profilePic,
+              bio: data.bio
             });
           }
         } else if (event === 'chat:delete_message') {
@@ -970,9 +1008,8 @@ export default function ChatInterface({
         setPartnerFocused(false);
         setChatState('direct');
         setSystemAlert(null);
-        setSidebarTab('chat');
-        // Immediately clear unread indicator for this peer
-        setRecents(prev => prev.map(r => r.peerId === peer.id ? { ...r, unreadCount: 0 } : r));
+        // Immediately clear unread indicator for this peer and sync with the server
+        await clearUnreadForPeer(peer.id, true);
         await fetchSideData(true); // force server sync so unread badge resets immediately
       } else {
         const errData = await res.json();
@@ -1110,20 +1147,24 @@ export default function ChatInterface({
     e.preventDefault();
     if (!ws || !activePartner || !messageText.trim()) return;
 
-    let finalContent = messageText.trim();
-    if (replyingTo) {
-      const parentClipText = replyingTo.content || (replyingTo.type === 'voice' ? 'Voice memo' : 'File attachment');
-      finalContent = `↩️ Replying to: "${parentClipText}"\n\n${finalContent}`;
-    }
-
+    const finalContent = messageText.trim();
     const outgoingMessageId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const replyPayload = replyingTo ? {
+      replyToMessageId: replyingTo.id,
+      replyToSenderId: replyingTo.senderId,
+      replyToSenderName: replyingTo.senderId === me.id ? me.username : (activePartner?.username || 'Stranger'),
+      replyToContent: replyingTo.content || '',
+      replyToType: replyingTo.type || 'text',
+      replyToMediaUrl: replyingTo.mediaUrl
+    } : {};
 
     ws.send(JSON.stringify({
       event: 'chat:message',
       data: {
         messageId: outgoingMessageId,
         recipientId: activePartner.id,
-        content: finalContent
+        content: finalContent,
+        ...replyPayload
       }
     }));
 
@@ -1134,7 +1175,8 @@ export default function ChatInterface({
       content: finalContent,
       timestamp: Date.now(),
       read: false,
-      deliveryStatus: 'sent'
+      deliveryStatus: 'sent',
+      ...replyPayload
     }] as any);
 
     setMessageText('');
@@ -2365,12 +2407,6 @@ export default function ChatInterface({
                   Okay
                 </button>
               </div>
-            ) : historyMessages.length === 0 ? (
-              <div className="py-24 text-center space-y-4 max-w-xs mx-auto">
-                <span className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto text-lg animate-bounce border ${theme === 'light' ? 'bg-violet-100 border-violet-300' : 'bg-violet-600/10 border-violet-500/25'} ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>💡</span>
-                <h4 className={`font-bold text-xs ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Vibe Established!</h4>
-                <p className={`text-[11px] leading-relaxed ${theme === 'light' ? 'text-slate-600' : 'text-slate-500'}`}>Start texting anonymously. Sockets are healthy. Have fun chatting!</p>
-              </div>
             ) : (
               historyMessages.map((m) => {
                 const isSelf = m.senderId === me.id;
@@ -2384,6 +2420,15 @@ export default function ChatInterface({
                   }
                 }
 
+                const replyMeta = m.replyToMessageId ? {
+                  replyToMessageId: m.replyToMessageId,
+                  replyToSenderId: m.replyToSenderId,
+                  replyToSenderName: m.replyToSenderName || (m.replyToSenderId === me.id ? me.username : activePartner?.username || 'Stranger'),
+                  replyToContent: m.replyToContent || quoteText || '',
+                  replyToType: m.replyToType || 'text',
+                  replyToMediaUrl: m.replyToMediaUrl
+                } : null;
+
                 let pressTimer: any = null;
 
                 return (
@@ -2394,16 +2439,55 @@ export default function ChatInterface({
                     }`}
                   >
                     <div
+                      ref={(el) => {
+                        if (el) {
+                          messageRefs.current[m.id] = el;
+                        } else {
+                          delete messageRefs.current[m.id];
+                        }
+                      }}
                       onContextMenu={(e) => { e.preventDefault(); setActiveMenuMessage(m); }}
-                      onTouchStart={() => {
-                        pressTimer = setTimeout(() => {
+                      onTouchStart={(e) => {
+                        touchStartXRef.current = e.touches[0].clientX;
+                        touchStartYRef.current = e.touches[0].clientY;
+                        pressTimer = window.setTimeout(() => {
                           setActiveMenuMessage(m);
                         }, 500);
                       }}
-                      onTouchEnd={() => {
-                        if (pressTimer) clearTimeout(pressTimer);
+                      onTouchMove={(e) => {
+                        const startX = touchStartXRef.current;
+                        const startY = touchStartYRef.current;
+                        if (startX === null || startY === null) return;
+                        const currentX = e.touches[0].clientX;
+                        const currentY = e.touches[0].clientY;
+                        if (Math.abs(currentX - startX) > 20 || Math.abs(currentY - startY) > 20) {
+                          if (pressTimer) {
+                            clearTimeout(pressTimer);
+                            pressTimer = null;
+                          }
+                        }
+                      }}
+                      onTouchEnd={(e) => {
+                        if (pressTimer) {
+                          clearTimeout(pressTimer);
+                          pressTimer = null;
+                        }
+                        const startX = touchStartXRef.current;
+                        const startY = touchStartYRef.current;
+                        touchStartXRef.current = null;
+                        touchStartYRef.current = null;
+                        if (startX === null || startY === null) return;
+                        const endX = e.changedTouches[0].clientX;
+                        const endY = e.changedTouches[0].clientY;
+                        const dx = endX - startX;
+                        const dy = Math.abs(endY - startY);
+                        if (dx > 80 && dy < 50) {
+                          handleMessageReply(m);
+                        }
                       }}
                       className={`p-4 md:p-5 rounded-2xl text-sm md:text-base leading-relaxed cursor-pointer select-none transition duration-150 hover:brightness-[0.98] active:scale-[0.99] select-none ${
+                        highlightedMessageId === m.id ? 'ring-2 ring-amber-400/70' : ''
+                      } ${
                         isSelf
                           ? (theme === 'light' 
                               ? 'bg-gradient-to-tr from-sky-500 to-sky-600 text-white rounded-tr-none shadow-md'
@@ -2412,16 +2496,23 @@ export default function ChatInterface({
                               ? 'bg-white text-slate-900 rounded-tl-none border border-slate-200 shadow-sm'
                               : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-800')
                       }`}
-                      title="Right-click, long press or tap for list choices"
+                      title="Right-click, long press or swipe right to reply"
                     >
-                      {quoteText && (
-                        <div className={`mb-2.5 p-2 px-3 border-l-2 text-xs rounded-xl font-medium flex flex-col gap-0.5 ${
-                          isSelf 
-                            ? 'bg-white/10 border-white/60 text-white/95' 
-                            : (theme === 'light' ? 'bg-slate-50 border-violet-500 text-slate-600' : 'bg-slate-900 border-violet-500 text-slate-200')
-                        }`}>
-                          <span className="font-extrabold uppercase tracking-widest text-[9px] opacity-75">↩️ Quoted Message</span>
-                          <span className="truncate italic">"{quoteText}"</span>
+                      {(replyMeta || quoteText) && (
+                        <div
+                          onClick={() => scrollToMessage(m.replyToMessageId || undefined)}
+                          className={`mb-2.5 p-2 px-3 border-l-2 text-xs rounded-xl font-medium flex flex-col gap-0.5 cursor-pointer ${
+                            isSelf
+                              ? 'bg-white/10 border-white/60 text-white/95'
+                              : (theme === 'light' ? 'bg-slate-50 border-violet-500 text-slate-600' : 'bg-slate-900 border-violet-500 text-slate-200')
+                          }`}
+                        >
+                          <span className="font-extrabold uppercase tracking-widest text-[9px] opacity-75">
+                            ↩️ {replyMeta ? `${replyMeta.replyToSenderName || 'Reply'} · ${replyMeta.replyToType === 'voice' ? 'Voice memo' : replyMeta.replyToType === 'image' ? 'Photo' : replyMeta.replyToType === 'video' ? 'Video clip' : 'Message'}` : 'Quoted Message'}
+                          </span>
+                          <span className="truncate italic">
+                            {replyMeta ? (replyMeta.replyToType === 'voice' ? 'Voice memo' : replyMeta.replyToType === 'image' ? 'Photo' : replyMeta.replyToType === 'video' ? 'Video clip' : replyMeta.replyToContent || 'Message') : `"${quoteText}"`}
+                          </span>
                         </div>
                       )}
 
@@ -2440,9 +2531,14 @@ export default function ChatInterface({
                     
                     <span className={`text-xs font-mono mt-1 pr-1 pl-1 flex items-center gap-1.5 select-none ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
-                          {renderMessageDeliveryIndicator(m)}
-                      
-                      {/* Interactive dots click trigger option for mobile users specifically */}
+                      {renderMessageDeliveryIndicator(m)}
+                      <button 
+                        onClick={() => handleMessageReply(m)}
+                        className={`opacity-0 group-hover:opacity-100 focus:opacity-100 transition p-1 rounded cursor-pointer ${theme === 'light' ? 'hover:bg-slate-200 text-slate-500 hover:text-slate-700' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'}`}
+                        title="Reply"
+                      >
+                        <CornerUpLeft className="w-3.5 h-3.5" />
+                      </button>
                       <button 
                         onClick={() => setActiveMenuMessage(m)}
                         className={`opacity-0 group-hover:opacity-100 focus:opacity-100 transition p-1 rounded cursor-pointer ml-1 ${theme === 'light' ? 'hover:bg-slate-200 text-slate-500 hover:text-slate-700' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'}`}
@@ -2487,14 +2583,18 @@ export default function ChatInterface({
                   ? 'bg-slate-100/80 border-slate-200 text-slate-700 shadow-sm'
                   : 'bg-slate-900 border-slate-800/80 text-slate-200'
               }`}>
-                <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => scrollToMessage(replyingTo.id)}
+                  className="flex items-center gap-3 min-w-0 text-left focus:outline-none"
+                >
                   <div className="flex flex-col min-w-0">
-                    <span className="font-extrabold uppercase tracking-widest text-[9px] text-violet-500 dark:text-violet-400">↩️ Replying to</span>
+                    <span className="font-extrabold uppercase tracking-widest text-[9px] text-violet-500 dark:text-violet-400">↩️ Replying to {replyingTo.senderId === me.id ? 'You' : activePartner?.username || 'Stranger'}</span>
                     <span className="truncate italic mt-0.5 opacity-90">
-                      "{replyingTo.content || (replyingTo.type === 'voice' ? 'Voice memo' : 'File attachment')}"
+                      {replyingTo.type === 'voice' ? 'Voice memo' : replyingTo.type === 'image' ? 'Photo' : replyingTo.type === 'video' ? 'Video clip' : replyingTo.content || 'Message'}
                     </span>
                   </div>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => setReplyingTo(null)}
@@ -2733,9 +2833,11 @@ export default function ChatInterface({
                     <textarea 
                       rows={2}
                       value={adminEditForm.bio}
-                      onChange={(e) => setAdminEditForm({ ...adminEditForm, bio: e.target.value })}
+                      maxLength={50}
+                      onChange={(e) => setAdminEditForm({ ...adminEditForm, bio: e.target.value.slice(0, 50) })}
                       className={`w-full px-3 py-1.5 border rounded-xl font-medium bg-transparent outline-none transition focus:border-violet-500 text-xs ${theme === 'light' ? 'border-slate-200 text-slate-800' : 'border-slate-800 text-white'}`}
                     />
+                    <div className="mt-1 text-[10px] text-slate-400">{adminEditForm.bio.trim().length}/50 characters</div>
                   </div>
 
                   {/* Location codes */}

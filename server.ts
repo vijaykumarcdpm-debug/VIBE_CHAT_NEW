@@ -316,9 +316,17 @@ function sendWSMessage(userId: string, event: string, data: any) {
 }
 
 function broadcastPresence(userId: string, online: boolean) {
+  const user = dbManager.getUser(userId);
   const payload = JSON.stringify({
     event: 'chat:presence',
-    data: { userId, online }
+    data: {
+      userId,
+      online,
+      username: user?.username || '',
+      type: user?.type || 'Guest',
+      profilePic: user?.profilePic || '',
+      bio: user?.bio || ''
+    }
   });
 
   for (const [_, client] of ACTIVE_CONNECTIONS) {
@@ -850,7 +858,15 @@ APP.post('/api/profile/update', authenticateToken, (req: any, res) => {
   
   if (profilePic) updates.profilePic = profilePic;
   if (username) updates.username = username;
-  if (bio !== undefined) updates.bio = bio;
+  if (bio !== undefined) {
+    if (typeof bio !== 'string') {
+      return res.status(400).json({ error: 'Invalid bio format.' });
+    }
+    if (bio.trim().length > 50) {
+      return res.status(400).json({ error: 'Bio cannot exceed 50 characters.' });
+    }
+    updates.bio = bio.trim();
+  }
   if (gender !== undefined) updates.gender = gender;
   if (age !== undefined) updates.age = age;
 
@@ -1235,7 +1251,15 @@ APP.post('/api/admin/users/update', authenticateToken, adminRequired, (req, res)
   if (username !== undefined) updates.username = username;
   if (gender !== undefined) updates.gender = gender;
   if (age !== undefined) updates.age = Number(age) || undefined;
-  if (bio !== undefined) updates.bio = bio;
+  if (bio !== undefined) {
+    if (typeof bio !== 'string') {
+      return res.status(400).json({ error: 'Invalid bio format.' });
+    }
+    if (bio.trim().length > 50) {
+      return res.status(400).json({ error: 'Bio cannot exceed 50 characters.' });
+    }
+    updates.bio = bio.trim();
+  }
   if (city !== undefined) updates.city = city;
   if (state !== undefined) updates.state = state;
   if (country !== undefined) updates.country = country;
@@ -1629,7 +1653,19 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
 
       // CHAT MESSAGES
       if (event === 'chat:message') {
-        const { recipientId, content, mediaUrl, type, messageId } = data;
+        const {
+          recipientId,
+          content,
+          mediaUrl,
+          type,
+          messageId,
+          replyToMessageId,
+          replyToSenderId,
+          replyToSenderName,
+          replyToContent,
+          replyToType,
+          replyToMediaUrl
+        } = data;
         const msgId = messageId || `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
         
         // Spam mitigation safety layer (rate limit count of chats etc inside memory if necessary, done at client)
@@ -1649,7 +1685,13 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
           mediaUrl,
           type: type || 'text',
           timestamp: Date.now(),
-          read: false
+          read: false,
+          replyToMessageId,
+          replyToSenderId,
+          replyToSenderName,
+          replyToContent,
+          replyToType,
+          replyToMediaUrl
         };
 
         dbManager.addMessage(msgRecord);
@@ -1671,6 +1713,16 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
             senderId: userId,
             typing: !!typing
           });
+        }
+      }
+
+      if (event === 'chat:mark_read') {
+        const { peerId } = data;
+        if (peerId) {
+          const readIds = dbManager.markMessagesRead(peerId, userId);
+          if (readIds.length > 0) {
+            sendWSMessage(peerId, 'chat:read', { messageIds: readIds, peerId: userId });
+          }
         }
       }
 

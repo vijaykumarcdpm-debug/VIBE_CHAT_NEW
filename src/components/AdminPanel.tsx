@@ -140,9 +140,9 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
     e.preventDefault();
     if (!editForm) return;
 
-    const bioWords = editForm.bio.trim().split(/\s+/).filter(w => w.length > 0);
-    if (bioWords.length > 50) {
-      showStatus('Bio cannot exceed 50 words.', true);
+    const bioText = editForm.bio.trim();
+    if (bioText.length > 50) {
+      showStatus('Bio cannot exceed 50 characters.', true);
       return;
     }
 
@@ -1419,11 +1419,13 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                   <textarea
                     rows={2}
                     value={editForm.bio}
+                    maxLength={50}
                     onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
                     className={`w-full text-xs p-2.5 rounded-xl outline-none border transition resize-none ${
                       theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500'
                     }`}
                   />
+                  <div className="mt-1 text-[10px] text-slate-400">{editForm.bio.trim().length}/50 characters</div>
                 </div>
 
                 <div>

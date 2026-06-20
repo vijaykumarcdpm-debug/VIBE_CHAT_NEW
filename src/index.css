@@ -50,21 +50,27 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
+    padding: max(env(safe-area-inset-top), 1rem) max(env(safe-area-inset-right), 1rem) max(env(safe-area-inset-bottom), 1rem) max(env(safe-area-inset-left), 1rem);
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     min-height: 100dvh;
     max-height: 100dvh;
     z-index: 50;
+    text-align: center;
   }
 
   .modal-card {
     width: 100%;
-    max-height: calc(100dvh - 4rem);
-    overflow: hidden;
+    max-width: min(100vw - 2rem, 68rem);
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    margin: auto;
+    position: relative;
+    box-sizing: border-box;
   }
 
   .modal-card-body {
@@ -72,13 +78,19 @@
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
 
-  .modal-card-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+  .modal-card > *:last-child {
+    margin-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+
+  .modal-card img,
+  .modal-card video,
+  .modal-card iframe,
+  .modal-card svg {
+    max-width: 100%;
+    height: auto;
   }
 }
 
@@ -96,57 +108,47 @@
    Uses attribute selectors to match Tailwind classes reliably across all modals.
 */
 @media (max-width: 768px) {
-  /* Step 1: Fix overlay container - center popup and allow scrolling when needed */
-  [class*="fixed"][class*="inset-0"] {
+  .modal-overlay {
     align-items: center !important;
     justify-content: center !important;
-    padding-top: 1rem !important;
-    padding-bottom: 1rem !important;
+    padding: max(env(safe-area-inset-top), 1rem) max(env(safe-area-inset-right), 1rem) max(env(safe-area-inset-bottom), 1rem) max(env(safe-area-inset-left), 1rem) !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     min-height: 100dvh !important;
     max-height: 100dvh !important;
+    text-align: center !important;
   }
 
-  /* Step 2: Modal card (direct child) - constrain height and ENABLE scrolling */
-  [class*="fixed"][class*="inset-0"] > * {
+  .modal-overlay > .modal-card {
+    max-width: min(100vw - 2rem, 720px) !important;
+    width: min(100%, calc(100vw - 2rem)) !important;
     max-height: calc(100dvh - 2rem) !important;
     height: auto !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+    margin: auto !important;
+    overflow: auto !important;
+    min-height: 0 !important;
   }
 
-  /* Step 3: Override overflow-hidden on modal containers (critical fix) */
-  [class*="fixed"][class*="inset-0"][class*="overflow-hidden"] {
+  .modal-overlay .modal-card-body {
     overflow-y: auto !important;
     overflow-x: hidden !important;
-  }
-
-  /* Step 4: Override overflow-hidden on nested content that should scroll */
-  [class*="fixed"][class*="inset-0"] *[class*="overflow-hidden"] {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-  }
-
-  /* Step 5: Deeply nested scrollable areas (for complex modals) */
-  [class*="fixed"] [class*="max-h-"] {
-    max-height: 100% !important;
-    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
+    max-height: calc(100dvh - 12rem) !important;
   }
 
-  /* Step 6: Keep close buttons and headers visible */
-  [class*="fixed"] button[class*="top-"],
-  [class*="fixed"] button[class*="right-"] {
+  .modal-overlay .modal-card img,
+  .modal-overlay .modal-card video,
+  .modal-overlay .modal-card iframe,
+  .modal-overlay .modal-card svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .modal-overlay button[class*="top-"],
+  .modal-overlay button[class*="right-"] {
     position: relative !important;
     z-index: 60 !important;
   }
-
-  /* Step 7: Allow flex containers inside modals to stack on mobile */
-  [class*="fixed"][class*="inset-0"] [class*="grid"],
-  [class*="fixed"][class*="inset-0"] [class*="flex"] {
-    max-height: 100% !important;
-  }
 }
+

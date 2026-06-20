@@ -45,6 +45,12 @@ export interface ChatMessage {
   timestamp: number;
   read: boolean;
   deliveryStatus?: 'sent' | 'delivered' | 'read';
+  replyToMessageId?: string;
+  replyToSenderId?: string;
+  replyToSenderName?: string;
+  replyToContent?: string;
+  replyToType?: 'text' | 'image' | 'voice' | 'video';
+  replyToMediaUrl?: string;
 }
 
 export interface RecentChat {

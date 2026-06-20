@@ -246,6 +246,17 @@ export default function App() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'people' | 'chat' | 'lounge' | 'vip'>('people');
+
+  const showThemeModalRef = useRef<boolean>(false);
+  const showOwnProfileModalRef = useRef<boolean>(false);
+  const showNotificationsDropdownRef = useRef<boolean>(false);
+  const showExitConfirmRef = useRef<boolean>(false);
+  const incomingCallRef = useRef<any>(null);
+  const outgoingCallRef = useRef<any>(null);
+  const activeCallRef = useRef<any>(null);
+  const screenRef = useRef<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
+  const sidebarTabRef = useRef<'people' | 'chat' | 'lounge' | 'vip'>('people');
+
   const [notifications, setNotifications] = useState<any[]>([
     {
       id: 'notif-welcome',
@@ -275,17 +286,6 @@ export default function App() {
 
   const [screen, setScreen] = useState<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
   const [isAdminPortal, setIsAdminPortal] = useState<boolean>(window.location.pathname === '/admin');
-
-  useEffect(() => {
-    if (showNotificationsDropdown || showOwnProfileModal || showExitConfirm) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [showNotificationsDropdown, showOwnProfileModal, showExitConfirm]);
 
   const [editUsername, setEditUsername] = useState<string>('');
   const [editGender, setEditGender] = useState<'Male' | 'Female' | 'Other'>('Other');
@@ -319,6 +319,8 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
+  const MAX_BIO_LENGTH = 50;
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUsername.trim()) {
@@ -330,9 +332,9 @@ export default function App() {
       showToast('Please enter a valid age of 18 or above.', true);
       return;
     }
-    const bioWords = editBio.trim().split(/\s+/).filter(w => w.length > 0);
-    if (bioWords.length > 50) {
-      showToast('Bio cannot exceed 50 words.', true);
+    const bioText = editBio.trim();
+    if (bioText.length > MAX_BIO_LENGTH) {
+      showToast(`Bio cannot exceed ${MAX_BIO_LENGTH} characters.`, true);
       return;
     }
 
@@ -411,6 +413,28 @@ export default function App() {
     isMatch?: boolean;
   } | null>(null);
 
+  useEffect(() => {
+    showThemeModalRef.current = showThemeModal;
+    showOwnProfileModalRef.current = showOwnProfileModal;
+    showNotificationsDropdownRef.current = showNotificationsDropdown;
+    showExitConfirmRef.current = showExitConfirm;
+    incomingCallRef.current = incomingCall;
+    outgoingCallRef.current = outgoingCall;
+    activeCallRef.current = activeCall;
+    screenRef.current = screen;
+    sidebarTabRef.current = sidebarTab;
+  }, [
+    showThemeModal,
+    showOwnProfileModal,
+    showNotificationsDropdown,
+    showExitConfirm,
+    incomingCall,
+    outgoingCall,
+    activeCall,
+    screen,
+    sidebarTab
+  ]);
+
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
   const [isChatActiveMobile, setIsChatActiveMobile] = useState<boolean>(false);
 
@@ -425,13 +449,13 @@ export default function App() {
         return;
       }
 
-      if (activeCall || incomingCall) {
+      if (activeCallRef.current || incomingCallRef.current) {
         e.preventDefault();
         e.returnValue = 'You are in an active session. Are you sure you want to leave?';
         return e.returnValue;
       }
 
-      if (screen === 'lobby' && sidebarTab === 'people' && !showExitConfirm) {
+      if (screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
         // Let the Android back handler show the exit confirmation.
       }
     };
@@ -444,6 +468,18 @@ export default function App() {
       pushAppGuardState();
     }
 
+    const restoreAppGuard = () => {
+      try {
+        if (!isVibeAppState(window.history.state)) {
+          pushAppGuardState();
+        } else {
+          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+        }
+      } catch (err) {
+        console.warn('Unable to restore app history state:', err);
+      }
+    };
+
     const handlePopState = (e: PopStateEvent) => {
       if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
         window.sessionStorage.removeItem('vibe_allow_quit');
@@ -452,65 +488,41 @@ export default function App() {
 
       const currentState = e.state;
       const isAppState = isVibeAppState(currentState);
-      const isGuardState = isAppState && currentState.appGuard === true;
-      const isRootState = isAppState && currentState.appRoot === true;
-
-      const restoreAppGuard = () => {
-        try {
-          if (!isVibeAppState(window.history.state)) {
-            pushAppGuardState();
-          } else {
-            window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
-          }
-        } catch (err) {
-          console.warn('Unable to restore app history state:', err);
-        }
-      };
-
-      // Immediately restore guard state so swipe/hardware back cannot leave the app while we handle it.
       restoreAppGuard();
-
       if (!isAppState) {
         return;
       }
 
-      if (showThemeModal) {
+      if (showThemeModalRef.current) {
         setShowThemeModal(false);
-        restoreAppGuard();
         return;
       }
-      if (showOwnProfileModal) {
+      if (showOwnProfileModalRef.current) {
         setShowOwnProfileModal(false);
-        restoreAppGuard();
         return;
       }
-      if (showNotificationsDropdown) {
+      if (showNotificationsDropdownRef.current) {
         setShowNotificationsDropdown(false);
-        restoreAppGuard();
         return;
       }
-      if (showExitConfirm) {
+      if (showExitConfirmRef.current) {
         setShowExitConfirm(false);
-        restoreAppGuard();
         return;
       }
 
-      if (incomingCall) {
+      if (incomingCallRef.current) {
         setIncomingCall(null);
-        restoreAppGuard();
         return;
       }
-      if (outgoingCall) {
+      if (outgoingCallRef.current) {
         setOutgoingCall(null);
-        restoreAppGuard();
         return;
       }
 
-      if (activeCall) {
+      if (activeCallRef.current) {
         setActiveCall(null);
         setScreen('lobby');
         setSidebarTab('people');
-        restoreAppGuard();
         return;
       }
 
@@ -521,31 +533,25 @@ export default function App() {
         const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || evt.detail.handled === true;
         if (handled) {
           window.sessionStorage.removeItem('vibe_back_handled');
-          restoreAppGuard();
           return;
         }
 
-        if (screen !== 'lobby') {
+        if (screenRef.current !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
-          restoreAppGuard();
           return;
         }
 
-        if (sidebarTab !== 'people') {
+        if (sidebarTabRef.current !== 'people') {
           setSidebarTab('people');
-          restoreAppGuard();
           return;
         }
 
-        if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
-          // should already be handled, but double-check
-          restoreAppGuard();
+        if (showThemeModalRef.current || showOwnProfileModalRef.current || showNotificationsDropdownRef.current) {
           return;
         }
 
         setShowExitConfirm(true);
-        restoreAppGuard();
       }, 0);
     };
     
@@ -555,7 +561,7 @@ export default function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [activeCall, incomingCall, screen, sidebarTab, showThemeModal, showOwnProfileModal, showNotificationsDropdown, showExitConfirm]);
+  }, []);
 
   // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
   // This handler MUST mark events as handled to prevent app exit
@@ -586,30 +592,30 @@ export default function App() {
 
     const handleAndroidBack = (evt: Event) => {
       // If an app-level modal is open, close it immediately, mark handled, and restore history guard
-      if (showExitConfirm) {
+      if (showExitConfirmRef.current) {
         setShowExitConfirm(false);
         markAndroidBackHandled(evt);
         restoreAppGuard();
         return;
       }
 
-      if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
-        if (showThemeModal) setShowThemeModal(false);
-        if (showOwnProfileModal) setShowOwnProfileModal(false);
-        if (showNotificationsDropdown) setShowNotificationsDropdown(false);
+      if (showThemeModalRef.current || showOwnProfileModalRef.current || showNotificationsDropdownRef.current) {
+        if (showThemeModalRef.current) setShowThemeModal(false);
+        if (showOwnProfileModalRef.current) setShowOwnProfileModal(false);
+        if (showNotificationsDropdownRef.current) setShowNotificationsDropdown(false);
         markAndroidBackHandled(evt);
         restoreAppGuard();
         return;
       }
 
       // If incoming or outgoing call overlay is present, close it first and restore history guard
-      if (incomingCall) {
+      if (incomingCallRef.current) {
         setIncomingCall(null);
         markAndroidBackHandled(evt);
         restoreAppGuard();
         return;
       }
-      if (outgoingCall) {
+      if (outgoingCallRef.current) {
         setOutgoingCall(null);
         markAndroidBackHandled(evt);
         restoreAppGuard();
@@ -625,32 +631,32 @@ export default function App() {
           return;
         }
 
-        if (showThemeModal) {
+        if (showThemeModalRef.current) {
           setShowThemeModal(false);
           markAndroidBackHandled(evt);
           restoreAppGuard();
           return;
         }
-        if (showOwnProfileModal) {
+        if (showOwnProfileModalRef.current) {
           setShowOwnProfileModal(false);
           markAndroidBackHandled(evt);
           restoreAppGuard();
           return;
         }
-        if (showNotificationsDropdown) {
+        if (showNotificationsDropdownRef.current) {
           setShowNotificationsDropdown(false);
           markAndroidBackHandled(evt);
           restoreAppGuard();
           return;
         }
-        if (showExitConfirm) {
+        if (showExitConfirmRef.current) {
           setShowExitConfirm(false);
           markAndroidBackHandled(evt);
           restoreAppGuard();
           return;
         }
 
-        if (incomingCall) {
+        if (incomingCallRef.current) {
           setIncomingCall(null);
           setScreen('lobby');
           setSidebarTab('people');
@@ -658,7 +664,7 @@ export default function App() {
           restoreAppGuard();
           return;
         }
-        if (outgoingCall) {
+        if (outgoingCallRef.current) {
           setOutgoingCall(null);
           setScreen('lobby');
           setSidebarTab('people');
@@ -667,7 +673,7 @@ export default function App() {
           return;
         }
 
-        if (activeCall) {
+        if (activeCallRef.current) {
           const confirmLeave = window.confirm("You are in an active call. Are you sure you want to go back and disconnect?");
           if (confirmLeave) {
             handleHangupCall();
@@ -677,7 +683,7 @@ export default function App() {
           return;
         }
 
-        if (screen !== 'lobby') {
+        if (screenRef.current !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
           markAndroidBackHandled(evt);
@@ -685,7 +691,7 @@ export default function App() {
           return;
         }
 
-        if (sidebarTab !== 'people') {
+        if (sidebarTabRef.current !== 'people') {
           setSidebarTab('people');
           markAndroidBackHandled(evt);
           restoreAppGuard();
@@ -700,7 +706,7 @@ export default function App() {
 
     window.addEventListener('app_hardware_back', handleAndroidBack as EventListener);
     return () => window.removeEventListener('app_hardware_back', handleAndroidBack as EventListener);
-  }, [showExitConfirm, showThemeModal, showOwnProfileModal, showNotificationsDropdown, activeCall, incomingCall, screen, sidebarTab]);
+  }, []);
 
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
@@ -1780,12 +1786,16 @@ export default function App() {
                   <textarea
                     rows={1}
                     value={editBio}
-                    onChange={(e) => setEditBio(e.target.value)}
+                    maxLength={MAX_BIO_LENGTH}
+                    onChange={(e) => setEditBio(e.target.value.slice(0, MAX_BIO_LENGTH))}
                     placeholder="Type interesting details about yourself..."
                     className={`w-full text-xs p-2 rounded-xl outline-none border transition resize-none ${
                       theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 placeholder-slate-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500 placeholder-slate-500'
                     }`}
                   />
+                  <div className={`mt-2 text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {editBio.trim().length}/{MAX_BIO_LENGTH} characters
+                  </div>
                 </div>
 
                 <div>
