@@ -42,7 +42,22 @@ export default function AudioVideoCall({
   const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const localPreviewTransform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
-  
+  const localVideoStyle = {
+    // User-facing local preview is mirrored for natural self-view only.
+    // This CSS transform must not affect the actual outgoing stream.
+    transform: localPreviewTransform,
+    WebkitTransform: localPreviewTransform,
+    msTransform: localPreviewTransform,
+    transformOrigin: 'center center' as const
+  };
+  const remoteVideoStyle = {
+    // Remote video must never be mirrored; keep orientation as received from peer.
+    transform: 'none',
+    WebkitTransform: 'none',
+    msTransform: 'none',
+    transformOrigin: 'center center' as const
+  };
+
   // Ref elements
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -303,7 +318,7 @@ export default function AudioVideoCall({
   return (
     <div
       ref={containerRef}
-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-[420px] md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
+      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
         isFullscreen ? 'h-screen rounded-none border-none' : ''
       }`}
     >
@@ -372,7 +387,7 @@ export default function AudioVideoCall({
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              style={{ transform: 'none' }}
+              style={remoteVideoStyle}
               className="w-full h-full object-cover"
             />
 
@@ -393,7 +408,7 @@ export default function AudioVideoCall({
                   autoPlay
                   playsInline
                   muted
-                  style={{ transform: localPreviewTransform }}
+                  style={localVideoStyle}
                   className="w-full h-full object-cover"
                 />
               <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-slate-950/60 rounded text-[9px] text-white">
@@ -443,7 +458,7 @@ export default function AudioVideoCall({
       )}
 
       {/* INTERACTIVE CONTROLS BAR */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-wrap w-fit max-w-[95%] z-20">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-nowrap overflow-x-auto w-full max-w-[calc(100vw-1rem)] z-20">
         {/* Toggle Audio Mute */}
         <button
           onClick={toggleMute}

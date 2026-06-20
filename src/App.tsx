@@ -490,14 +490,20 @@ export default function App() {
 
       const restoreAppGuard = () => {
         try {
-          pushAppGuardState();
+          if (!isVibeAppState(window.history.state)) {
+            pushAppGuardState();
+          } else {
+            window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+          }
         } catch (err) {
           console.warn('Unable to restore app history state:', err);
         }
       };
 
+      // Immediately restore guard state so swipe/hardware back cannot leave the app while we handle it.
+      restoreAppGuard();
+
       if (!isAppState) {
-        restoreAppGuard();
         return;
       }
 
@@ -587,11 +593,36 @@ export default function App() {
   // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
   // This handler MUST mark events as handled to prevent app exit
   useEffect(() => {
+    const restoreAppGuard = () => {
+      try {
+        if (window.history.state && (window.history.state as any).vibe_app === true) {
+          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+        } else {
+          window.history.pushState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+        }
+      } catch (err) {
+        console.warn('Unable to restore app history state:', err);
+      }
+    };
+
+    const markAndroidBackHandled = (evt: Event) => {
+      try {
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
+      } catch (e) {}
+      if (evt && typeof evt === 'object') {
+        try {
+          (evt as any).detail = (evt as any).detail || {};
+          (evt as any).detail.handled = true;
+        } catch (e) {}
+      }
+    };
+
     const handleAndroidBack = (evt: Event) => {
-      // If an app-level modal is open, close it immediately and mark handled
+      // If an app-level modal is open, close it immediately, mark handled, and restore history guard
       if (showExitConfirm) {
         setShowExitConfirm(false);
-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        markAndroidBackHandled(evt);
+        restoreAppGuard();
         return;
       }
 
@@ -599,19 +630,22 @@ export default function App() {
         if (showThemeModal) setShowThemeModal(false);
         if (showOwnProfileModal) setShowOwnProfileModal(false);
         if (showNotificationsDropdown) setShowNotificationsDropdown(false);
-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        markAndroidBackHandled(evt);
+        restoreAppGuard();
         return;
       }
 
-      // If incoming or outgoing call overlay is present, close it first
+      // If incoming or outgoing call overlay is present, close it first and restore history guard
       if (incomingCall) {
         setIncomingCall(null);
-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        markAndroidBackHandled(evt);
+        restoreAppGuard();
         return;
       }
       if (outgoingCall) {
         setOutgoingCall(null);
-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        markAndroidBackHandled(evt);
+        restoreAppGuard();
         return;
       }
 
@@ -620,23 +654,32 @@ export default function App() {
         const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
         if (handled) {
           window.sessionStorage.removeItem('vibe_back_handled');
+          restoreAppGuard();
           return;
         }
 
         if (showThemeModal) {
           setShowThemeModal(false);
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
         if (showOwnProfileModal) {
           setShowOwnProfileModal(false);
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
         if (showNotificationsDropdown) {
           setShowNotificationsDropdown(false);
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
         if (showExitConfirm) {
           setShowExitConfirm(false);
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
 
@@ -644,12 +687,16 @@ export default function App() {
           setIncomingCall(null);
           setScreen('lobby');
           setSidebarTab('people');
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
         if (outgoingCall) {
           setOutgoingCall(null);
           setScreen('lobby');
           setSidebarTab('people');
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
 
@@ -658,21 +705,29 @@ export default function App() {
           if (confirmLeave) {
             handleHangupCall();
           }
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
 
         if (screen !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
 
         if (sidebarTab !== 'people') {
           setSidebarTab('people');
+          markAndroidBackHandled(evt);
+          restoreAppGuard();
           return;
         }
 
         setShowExitConfirm(true);
+        markAndroidBackHandled(evt);
+        restoreAppGuard();
       }, 50);
     };
 
@@ -1485,8 +1540,8 @@ export default function App() {
       )}
 
       {activeCall && (
-        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
-          <div className="mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0">
+        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-0 md:p-4 overflow-y-auto touch-pan-y">
+          <div className="mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100vh-4rem)] overflow-hidden min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -1500,7 +1555,7 @@ export default function App() {
               peerCity={activeCall.peerCity}
               peerState={activeCall.peerState}
               peerCountry={activeCall.peerCountry}
-              onNextMatch={activeCall?.isMatch && activeCall?.type === 'audio' ? handleNextStranger : undefined}
+              onNextMatch={activeCall?.isMatch ? handleNextStranger : undefined}
             />
           </div>
         </div>
