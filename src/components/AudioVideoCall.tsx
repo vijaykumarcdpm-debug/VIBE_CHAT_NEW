@@ -41,6 +41,7 @@ export default function AudioVideoCall({
   const [callStatus, setCallStatus] = useState<string>('Connecting stream...');
   const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const localPreviewTransform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
   
   // Ref elements
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -395,7 +396,7 @@ export default function AudioVideoCall({
                   autoPlay
                   playsInline
                   muted
-                  style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+                  style={{ transform: localPreviewTransform }}
                   className="w-full h-full object-cover"
                 />
               <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-slate-950/60 rounded text-[9px] text-white">
@@ -421,11 +422,11 @@ export default function AudioVideoCall({
           
           <div className="relative mb-6">
             <span className="absolute inset-0 w-28 h-28 bg-violet-500/10 rounded-full animate-bounce"></span>
-            <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 p-1 animate-pulse">
+            <div className="relative rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 p-1 animate-pulse inline-flex">
               <img
                 src={peerImageSrc}
                 alt={peerName}
-                className="w-24 h-24 rounded-full object-cover bg-slate-900"
+                className="w-24 h-24 rounded-full object-cover bg-slate-900 block"
                 referrerPolicy="no-referrer"
               />
             </div>

@@ -448,30 +448,33 @@ export default function App() {
   const [isChatActiveMobile, setIsChatActiveMobile] = useState<boolean>(false);
 
   useEffect(() => {
+    const isVibeAppState = (state: any) => state && state.vibe_app === true;
+    const pushAppRootState = () => window.history.pushState({ vibe_app: true, appRoot: true }, "");
+    const pushAppGuardState = () => window.history.pushState({ vibe_app: true, appGuard: true }, "");
+
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Allow quit if explicitly confirmed
       if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
         window.sessionStorage.removeItem('vibe_allow_quit');
         return;
       }
 
-      // Prevent unload if in active call or main lobby
       if (activeCall || incomingCall) {
         e.preventDefault();
         e.returnValue = 'You are in an active session. Are you sure you want to leave?';
         return e.returnValue;
       }
 
-      // Also prevent exiting from main lobby without confirmation
       if (screen === 'lobby' && sidebarTab === 'people' && !showExitConfirm) {
-        // Don't always show the browser's beforeunload dialog, but ensure our modal will be shown
-        // The Android back button handler will set showExitConfirm, so we just need to wait
+        // Let the Android back handler show the exit confirmation.
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    if (!window.history.state || window.history.state.vibe_app !== true) {
-      window.history.pushState({ vibe_app: true }, "");
+    if (!isVibeAppState(window.history.state)) {
+      pushAppRootState();
+      pushAppGuardState();
+    } else if (!window.history.state.appGuard) {
+      pushAppGuardState();
     }
 
     const handlePopState = (e: PopStateEvent) => {
@@ -480,30 +483,61 @@ export default function App() {
         return;
       }
 
-      window.history.pushState({ vibe_app: true }, "");
+      const currentState = e.state;
+      const isAppState = isVibeAppState(currentState);
+      const isGuardState = isAppState && currentState.appGuard === true;
+      const isRootState = isAppState && currentState.appRoot === true;
+
+      const restoreAppGuard = () => {
+        try {
+          pushAppGuardState();
+        } catch (err) {
+          console.warn('Unable to restore app history state:', err);
+        }
+      };
+
+      if (!isAppState) {
+        restoreAppGuard();
+        return;
+      }
 
       if (showThemeModal) {
         setShowThemeModal(false);
+        restoreAppGuard();
         return;
       }
       if (showOwnProfileModal) {
         setShowOwnProfileModal(false);
+        restoreAppGuard();
         return;
       }
       if (showNotificationsDropdown) {
         setShowNotificationsDropdown(false);
+        restoreAppGuard();
         return;
       }
       if (showExitConfirm) {
         setShowExitConfirm(false);
+        restoreAppGuard();
         return;
       }
 
-      if (activeCall || incomingCall) {
-        const confirmLeave = window.confirm("You are in an active call. Are you sure you want to go back and disconnect?");
-        if (confirmLeave) {
-          handleHangupCall();
-        }
+      if (incomingCall) {
+        setIncomingCall(null);
+        restoreAppGuard();
+        return;
+      }
+      if (outgoingCall) {
+        setOutgoingCall(null);
+        restoreAppGuard();
+        return;
+      }
+
+      if (activeCall) {
+        setActiveCall(null);
+        setScreen('lobby');
+        setSidebarTab('people');
+        restoreAppGuard();
         return;
       }
 
@@ -511,25 +545,34 @@ export default function App() {
       window.dispatchEvent(evt);
 
       setTimeout(() => {
-        if (window.sessionStorage.getItem('vibe_back_handled') === 'true') {
+        const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || evt.detail.handled === true;
+        if (handled) {
           window.sessionStorage.removeItem('vibe_back_handled');
+          restoreAppGuard();
           return;
         }
 
-        if (!evt.detail.handled) {
-          if (screen === 'plans') {
-            setScreen('lobby');
-            setSidebarTab('people');
-          } else if (screen === 'geo') {
-            setScreen('lobby');
-          } else if (screen === 'admin') {
-            setScreen('lobby');
-          } else if (sidebarTab !== 'people') {
-            setSidebarTab('people');
-          } else {
-            setShowExitConfirm(true);
-          }
+        if (screen !== 'lobby') {
+          setScreen('lobby');
+          setSidebarTab('people');
+          restoreAppGuard();
+          return;
         }
+
+        if (sidebarTab !== 'people') {
+          setSidebarTab('people');
+          restoreAppGuard();
+          return;
+        }
+
+        if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
+          // should already be handled, but double-check
+          restoreAppGuard();
+          return;
+        }
+
+        setShowExitConfirm(true);
+        restoreAppGuard();
       }, 0);
     };
     
@@ -547,6 +590,7 @@ export default function App() {
     const handleAndroidBack = (evt: Event) => {
       // If an app-level modal is open, close it immediately and mark handled
       if (showExitConfirm) {
+        setShowExitConfirm(false);
         try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
@@ -579,8 +623,37 @@ export default function App() {
           return;
         }
 
-        // If there's an active call, ask confirmation to leave
-        if (activeCall || incomingCall) {
+        if (showThemeModal) {
+          setShowThemeModal(false);
+          return;
+        }
+        if (showOwnProfileModal) {
+          setShowOwnProfileModal(false);
+          return;
+        }
+        if (showNotificationsDropdown) {
+          setShowNotificationsDropdown(false);
+          return;
+        }
+        if (showExitConfirm) {
+          setShowExitConfirm(false);
+          return;
+        }
+
+        if (incomingCall) {
+          setIncomingCall(null);
+          setScreen('lobby');
+          setSidebarTab('people');
+          return;
+        }
+        if (outgoingCall) {
+          setOutgoingCall(null);
+          setScreen('lobby');
+          setSidebarTab('people');
+          return;
+        }
+
+        if (activeCall) {
           const confirmLeave = window.confirm("You are in an active call. Are you sure you want to go back and disconnect?");
           if (confirmLeave) {
             handleHangupCall();
@@ -588,7 +661,6 @@ export default function App() {
           return;
         }
 
-        // If not on People lobby, navigate back to People
         if (screen !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
@@ -600,7 +672,6 @@ export default function App() {
           return;
         }
 
-        // At People Lobby and nothing else to close: show exit confirmation
         setShowExitConfirm(true);
       }, 50);
     };
@@ -1414,8 +1485,8 @@ export default function App() {
       )}
 
       {activeCall && (
-        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4 overflow-hidden">
-          <div className="w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
+          <div className="mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -1436,7 +1507,7 @@ export default function App() {
       )}
 
       {incomingCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-hidden">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
           <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
             <div className="relative mx-auto w-16 h-16">
               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
@@ -1482,7 +1553,7 @@ export default function App() {
       )}
 
       {outgoingCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-hidden">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
           <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
             <div className="relative mx-auto w-16 h-16">
               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
@@ -1515,8 +1586,8 @@ export default function App() {
       )}
 
       {!rulesAgreed && me && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 overflow-hidden">
-          <div className={`w-full max-w-md max-h-[95vh] overflow-y-auto scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
+          <div className={`mx-auto w-full max-w-md max-h-[95vh] overflow-y-auto min-h-0 scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/10 blur-xl rounded-full pointer-events-none"></div>
             
             <div className="text-4xl">📜</div>
@@ -1556,8 +1627,8 @@ export default function App() {
       )}
 
       {adminChangesNotice && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[160] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
-          <div className={`w-full max-w-sm max-h-[90vh] overflow-y-auto border rounded-3xl p-6 relative shadow-2xl ${
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[160] flex items-center justify-center p-4 overflow-y-auto touch-pan-y animate-fade-in text-slate-100">
+          <div className={`mx-auto w-full max-w-sm max-h-[90vh] overflow-y-auto min-h-0 border rounded-3xl p-6 relative shadow-2xl ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-xl' : 'bg-slate-905 border-slate-800 text-slate-100 shadow-black/90'
           }`}>
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-500"></div>
@@ -1602,8 +1673,8 @@ export default function App() {
       )}
 
       {showOwnProfileModal && me && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
-          <div className={`w-full max-w-lg max-h-[95vh] overflow-y-auto scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100">
+          <div className={`mx-auto w-full max-w-lg max-h-[95vh] overflow-y-auto min-h-0 scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
@@ -1799,7 +1870,7 @@ export default function App() {
             theme={theme}
             onBack={() => {
               setIsAdminPortal(false);
-              window.history.pushState({}, '', '/');
+              try { window.history.pushState({ vibe_app: true }, '', '/'); } catch (e) {}
             }}
             onAdminSuccess={(adminToken, adminUser) => {
               localStorage.setItem('vibechat_token', adminToken);
@@ -2182,8 +2253,8 @@ export default function App() {
       </div>
 
       {showExitConfirm && (
-        <div className={`fixed inset-0 backdrop-blur-md z-[200] flex items-center justify-center p-4 text-center animate-fade-in overflow-hidden ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
-          <div className={`p-8 border rounded-3xl max-w-sm w-full space-y-6 shadow-2xl relative overflow-hidden ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+        <div className={`fixed inset-0 backdrop-blur-md z-[200] overflow-y-auto touch-pan-y p-4 text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
+          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
             <div className="text-4xl mb-2">🚪</div>
             <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
               Are you sure you want to quit?

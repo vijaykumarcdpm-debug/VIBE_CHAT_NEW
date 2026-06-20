@@ -100,7 +100,7 @@ export default function ChatInterface({
   const [inspectedPeer, setInspectedPeer] = useState<any | null>(null);
 
   const openModal = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
-    window.history.pushState({ modalOpen: true }, "");
+    window.history.pushState({ vibe_app: true, modalOpen: true }, "");
     setter(value);
   };
 
@@ -315,7 +315,7 @@ export default function ChatInterface({
 
   const handleToggleOptionsDropdown = () => {
     if (!showOptionsDropdown) {
-      window.history.pushState({ dropdownOpen: true }, "");
+      window.history.pushState({ vibe_app: true, dropdownOpen: true }, "");
       setShowOptionsDropdown(true);
     } else {
       closeDropdownWithHistory();
@@ -326,7 +326,7 @@ export default function ChatInterface({
     if (showOptionsDropdown) {
       setShowOptionsDropdown(false);
       if (window.history.state?.dropdownOpen) {
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState({ vibe_app: true }, '', window.location.pathname);
       }
     }
   };
@@ -2073,8 +2073,8 @@ export default function ChatInterface({
           
           {/* REPORT OVERLAY DIALOG */}
           {showReportDialog && (
-            <div className="fixed inset-0 bg-slate-950/80 z-30 flex items-center justify-center p-4 overflow-hidden animate-fade-in">
-              <div className={`p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] overflow-y-auto flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
+            <div className="fixed inset-0 bg-slate-950/80 z-30 overflow-y-auto touch-pan-y p-4 animate-fade-in">
+              <div className={`mx-auto p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] overflow-y-auto min-h-0 flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
                 <h4 className={`font-bold font-display text-base mb-2 shrink-0 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>File Abuse Complaint</h4>
                 <p className={`text-xs mb-4 leading-relaxed shrink-0 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
                 
@@ -2617,8 +2617,8 @@ export default function ChatInterface({
 
       {/* INSPECTED PEER DETAIL MODAL POPUP DISPLAY CARD */}
       {inspectedPeer && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
-          <div className={`w-full max-w-sm max-h-[calc(100vh-4rem)] border rounded-3xl p-6 relative overflow-y-auto shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100">
+          <div className={`mx-auto w-full max-w-sm max-h-[calc(100vh-4rem)] border rounded-3xl p-6 relative overflow-y-auto min-h-0 shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
             <button
               onClick={() => {
                 setInspectedPeer(null);
@@ -2892,8 +2892,8 @@ export default function ChatInterface({
 
       {/* THEME AND WALLPAPER CUSTOMIZATION MODAL */}
       {showThemeModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100">
-          <div className={`w-full max-w-xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 ${
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100">
+          <div className={`mx-auto w-full max-w-xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 min-h-0 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
@@ -2977,11 +2977,11 @@ export default function ChatInterface({
       {/* FLOATING ACTION INTERACTION OPTIONS MODAL CARD */}
       {activeMenuMessage && (
         <div 
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[250] flex items-center justify-center p-4 overflow-hidden animate-fade-in text-slate-100"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[250] overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100"
           onClick={() => setActiveMenuMessage(null)}
         >
           <div 
-            className={`w-full max-w-xs border rounded-3xl p-5 relative overflow-y-auto max-h-[80vh] shadow-2xl ${
+            className={`mx-auto w-full max-w-xs border rounded-3xl p-5 relative overflow-y-auto max-h-[80vh] min-h-0 shadow-2xl ${
               theme === "light" 
                 ? "bg-white border-slate-200 text-slate-900 shadow-slate-300" 
                 : "bg-slate-900 border-slate-800 text-white shadow-black/80"
@@ -3064,8 +3064,8 @@ export default function ChatInterface({
 
       {/* FULL SCREEN IMAGE VIEWER */}
       {fullScreenImage && (
-        <div className="fixed inset-0 z-[280] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden animate-fade-in">
-          <div className="relative w-full max-w-3xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950">
+        <div className="fixed inset-0 z-[280] bg-slate-950/90 backdrop-blur-sm overflow-y-auto touch-pan-y p-4 animate-fade-in">
+          <div className="relative mx-auto w-full max-w-3xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950 min-h-0">
             <button
               type="button"
               onClick={() => setFullScreenImage(null)}
