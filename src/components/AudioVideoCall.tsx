@@ -54,6 +54,9 @@ export default function AudioVideoCall({
   const signalQueue = useRef<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const defaultAvatarDataUrl = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`;
+  const peerImageSrc = (peerPic && peerPic.trim()) ? peerPic : defaultAvatarDataUrl;
+
   const processSignal = async (signal: any, pc: RTCPeerConnection) => {
     try {
       if (signal.sdp) {
@@ -392,7 +395,7 @@ export default function AudioVideoCall({
                   autoPlay
                   playsInline
                   muted
-                  style={{ transform: 'none' }}
+                  style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
                   className="w-full h-full object-cover"
                 />
               <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-slate-950/60 rounded text-[9px] text-white">
@@ -416,19 +419,17 @@ export default function AudioVideoCall({
             className="hidden"
           />
           
-          {callStatus !== 'Connected' && (
           <div className="relative mb-6">
             <span className="absolute inset-0 w-28 h-28 bg-violet-500/10 rounded-full animate-bounce"></span>
             <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 p-1 animate-pulse">
               <img
-                src={peerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+                src={peerImageSrc}
                 alt={peerName}
                 className="w-24 h-24 rounded-full object-cover bg-slate-900"
                 referrerPolicy="no-referrer"
               />
             </div>
           </div>
-          )}
           <h3 className="text-xl font-bold font-display text-white mb-2">{peerName}</h3>
           {(peerCity || peerState) && (
             <p className="text-slate-400 text-xs mb-3">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</p>

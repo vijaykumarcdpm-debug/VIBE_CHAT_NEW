@@ -441,6 +441,7 @@ export default function App() {
     peerCity?: string;
     peerState?: string;
     peerCountry?: string;
+    isMatch?: boolean;
   } | null>(null);
 
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
@@ -544,37 +545,63 @@ export default function App() {
   // This handler MUST mark events as handled to prevent app exit
   useEffect(() => {
     const handleAndroidBack = (evt: Event) => {
-      const customEvent = evt as CustomEvent;
-      
-      // FIRST: Check app-level state and exit confirmation
+      // If an app-level modal is open, close it immediately and mark handled
       if (showExitConfirm) {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
 
       if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
+        if (showThemeModal) setShowThemeModal(false);
+        if (showOwnProfileModal) setShowOwnProfileModal(false);
+        if (showNotificationsDropdown) setShowNotificationsDropdown(false);
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
 
-      if (activeCall || incomingCall) {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
+      // If incoming or outgoing call overlay is present, close it first
+      if (incomingCall) {
+        setIncomingCall(null);
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        return;
+      }
+      if (outgoingCall) {
+        setOutgoingCall(null);
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
 
-      // If not at main lobby, handle screen transitions
-      if (screen !== 'lobby' || sidebarTab !== 'people') {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
-        return;
-      }
-
-      // At main lobby: let child components handle modals first
-      // If nothing handles it in the next frame, show exit confirmation
+      // Allow child listeners to run first by deferring action to next tick
       setTimeout(() => {
-        if (window.sessionStorage.getItem('vibe_back_handled') !== 'true') {
-          setShowExitConfirm(true);
+        const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
+        if (handled) {
+          window.sessionStorage.removeItem('vibe_back_handled');
+          return;
         }
-        window.sessionStorage.removeItem('vibe_back_handled');
+
+        // If there's an active call, ask confirmation to leave
+        if (activeCall || incomingCall) {
+          const confirmLeave = window.confirm("You are in an active call. Are you sure you want to go back and disconnect?");
+          if (confirmLeave) {
+            handleHangupCall();
+          }
+          return;
+        }
+
+        // If not on People lobby, navigate back to People
+        if (screen !== 'lobby') {
+          setScreen('lobby');
+          setSidebarTab('people');
+          return;
+        }
+
+        if (sidebarTab !== 'people') {
+          setSidebarTab('people');
+          return;
+        }
+
+        // At People Lobby and nothing else to close: show exit confirmation
+        setShowExitConfirm(true);
       }, 50);
     };
 
@@ -1034,7 +1061,9 @@ export default function App() {
             type: data.type || 'audio',
             peerCity: data.peerCity,
             peerState: data.peerState,
-            peerCountry: data.peerCountry
+            peerCountry: data.peerCountry,
+            // mark this call as originating from matchmaking pool
+            isMatch: true
           });
           setIncomingCall(null);
           setOutgoingCall(null);
@@ -1400,7 +1429,7 @@ export default function App() {
               peerCity={activeCall.peerCity}
               peerState={activeCall.peerState}
               peerCountry={activeCall.peerCountry}
-              onNextMatch={handleNextStranger}
+              onNextMatch={activeCall?.isMatch && activeCall?.type === 'audio' ? handleNextStranger : undefined}
             />
           </div>
         </div>

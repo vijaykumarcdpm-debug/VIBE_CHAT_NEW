@@ -96,7 +96,7 @@ export default function ChatInterface({
   // Navigation / View states
   // 'idle' | 'searching' | 'matched' | 'direct' (private conversations with friends/recents)
   const [chatState, setChatState] = useState<'idle' | 'searching' | 'matched' | 'direct'>('idle');
-  const [activePartner, setActivePartner] = useState<Partial<UserProfile> | null>(null);
+  const [activePartner, setActivePartner] = useState<(Partial<UserProfile> & { isMatch?: boolean }) | null>(null);
   const [inspectedPeer, setInspectedPeer] = useState<any | null>(null);
 
   const openModal = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
@@ -484,6 +484,18 @@ export default function ChatInterface({
   const [showNoOnlineUsersPopup, setShowNoOnlineUsersPopup] = useState<boolean>(false);
   const [isMatchingLoading, setIsMatchingLoading] = useState<boolean>(false);
   const [showMatchErrorPopup, setShowMatchErrorPopup] = useState<boolean>(false);
+  const [searchStatusIndex, setSearchStatusIndex] = useState<number>(0);
+  const matchStatusMessages = [
+    'Searching for preferred users...',
+    'Checking online users...',
+    'Matching based on your filters...',
+    'Expanding search radius...',
+    'Almost there...',
+    'Still searching...',
+    'Waiting for another compatible user...',
+    'If preferred match not found, trying nearest match...'
+  ];
+  const matchStatusMessage = matchStatusMessages[searchStatusIndex];
   const matchSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingMatchRef = useRef<boolean>(false);
 
@@ -521,6 +533,21 @@ export default function ChatInterface({
       matchSearchTimeoutRef.current = null;
     }
   };
+
+  useEffect(() => {
+    if (chatState !== 'searching') {
+      return;
+    }
+
+    setSearchStatusIndex(0);
+    const interval = window.setInterval(() => {
+      setSearchStatusIndex(prevIndex => (prevIndex + 1) % matchStatusMessages.length);
+    }, 4500);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [chatState, matchStatusMessages.length]);
 
   // Senders / Inputs
   const [messageText, setMessageText] = useState<string>('');
@@ -730,6 +757,7 @@ export default function ChatInterface({
             city: data.peerCity,
             state: data.peerState,
             country: data.peerCountry,
+            isMatch: true,
             online: true
           });
           setPartnerFocused(false);
@@ -948,12 +976,14 @@ export default function ChatInterface({
       setIsMatchingLoading(true);
       setShowMatchErrorPopup(false);
       setChatState('searching');
+      setSearchStatusIndex(0);
 
       matchSearchTimeoutRef.current = setTimeout(() => {
         setIsMatchingLoading(false);
         setShowNoMatchPopup(true);
         setChatState('idle');
         pendingMatchRef.current = false;
+        setSearchStatusIndex(0);
       }, 60000);
       return;
     }
@@ -988,12 +1018,14 @@ export default function ChatInterface({
       return;
     }
 
+    setSearchStatusIndex(0);
     setChatState('searching');
     // 60 second timeout as required
     matchSearchTimeoutRef.current = setTimeout(() => {
       setIsMatchingLoading(false);
       setShowNoMatchPopup(true);
       setChatState('idle');
+      setSearchStatusIndex(0);
     }, 60000);
   };
 
@@ -1022,6 +1054,7 @@ export default function ChatInterface({
     setIsMatchingLoading(false);
     pendingMatchRef.current = false;
     clearMatchSearchTimeout();
+    setSearchStatusIndex(0);
     setChatState('idle');
     if (!ws) return;
     try {
@@ -2260,7 +2293,7 @@ export default function ChatInterface({
 
                 <div className="space-y-2">
                   <h4 className={`font-bold text-sm ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Finding your perfect match...</h4>
-                  <p className="text-[11px] text-slate-200 animate-pulse">Searching for users...</p>
+                  <p className="text-[11px] text-slate-200 animate-pulse">{matchStatusMessage}</p>
                 </div>
 
                 <button
@@ -2537,7 +2570,7 @@ export default function ChatInterface({
                   <Send className="w-5 h-5" />
                 </button>
                 
-                {chatState === 'matched' && (
+                {chatState === 'matched' && activePartner?.isMatch && sidebarTab === 'lounge' && (
                   <button
                     type="button"
                     onClick={handleNextStranger}
