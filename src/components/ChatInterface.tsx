@@ -872,6 +872,15 @@ export default function ChatInterface({
     };
   }, [ws, activePartner]);
 
+  // Handle next match event from App component
+  useEffect(() => {
+    const handleNextMatchEvent = () => {
+      handleNextStranger();
+    };
+    window.addEventListener('app:next_match', handleNextMatchEvent);
+    return () => window.removeEventListener('app:next_match', handleNextMatchEvent);
+  }, []);
+
   // Continuous background refresh on mount - keeps data synchronized while app is open
   useEffect(() => {
     mountedRef.current = true;

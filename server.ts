@@ -115,12 +115,13 @@ function broadcastToAll(event: string, data: any) {
   }
 }
 
-// Matchmaking execution
+// Matchmaking execution - try perfect match first, then fallback to any match
 function searchMatches() {
   if (MATCHING_QUEUE.length < 2) return;
 
   let bestPair: { aIndex: number; bIndex: number; score: number } | null = null;
 
+  // STEP 1: Find best matching pair based on filters
   for (let i = 0; i < MATCHING_QUEUE.length; i++) {
     const userA = MATCHING_QUEUE[i];
     for (let j = i + 1; j < MATCHING_QUEUE.length; j++) {
@@ -136,6 +137,29 @@ function searchMatches() {
     }
   }
 
+  // STEP 2: If no perfect match found, try random matching (especially for non-VIP)
+  if (!bestPair) {
+    // Find any two users who haven't been matched yet
+    for (let i = 0; i < MATCHING_QUEUE.length; i++) {
+      const userA = MATCHING_QUEUE[i];
+      // Prefer pairing if not VIP (they get random matches)
+      if (userA.type !== 'Royal VIP' && userA.type !== 'Admin' && userA.type !== 'Moderator') {
+        for (let j = i + 1; j < MATCHING_QUEUE.length; j++) {
+          const userB = MATCHING_QUEUE[j];
+          // Allow any pairing for non-VIP users
+          bestPair = { aIndex: i, bIndex: j, score: 1 };
+          break;
+        }
+        if (bestPair) break;
+      }
+    }
+  }
+
+  // STEP 3: Last resort - just match any two users if only 2 in queue
+  if (!bestPair && MATCHING_QUEUE.length === 2) {
+    bestPair = { aIndex: 0, bIndex: 1, score: 0 };
+  }
+
   if (!bestPair) return;
 
   const { aIndex, bIndex } = bestPair;
@@ -147,6 +171,7 @@ function searchMatches() {
   if (profileA && profileB) {
     const callerIsA = aIndex < bIndex;
 
+    // Send match success notifications
     sendWSMessage(userA.userId, 'match:success', {
       peerId: profileB.id,
       peerName: profileB.username,
@@ -169,6 +194,7 @@ function searchMatches() {
       peerCountry: profileA.country
     });
 
+    // Initiate audio call automatically
     sendWSMessage(userA.userId, 'match:call_start', {
       peerId: profileB.id,
       peerName: profileB.username,
@@ -191,10 +217,14 @@ function searchMatches() {
       type: 'audio'
     });
 
+    // Register active call
     ACTIVE_CALLS.set(userA.userId, { peerId: userB.userId, type: 'audio' });
     ACTIVE_CALLS.set(userB.userId, { peerId: userA.userId, type: 'audio' });
+
+    console.log(`[MATCH] Paired ${userA.userId} with ${userB.userId}`);
   }
 
+  // Remove matched pair from queue
   const matchedIndices = new Set<number>([aIndex, bIndex]);
   MATCHING_QUEUE = MATCHING_QUEUE.filter((_, index) => !matchedIndices.has(index));
   broadcastToAll('stats:update', getLiveStats());
@@ -1314,6 +1344,13 @@ APP.post('/api/admin/verify-photo', authenticateToken, adminRequired, (req, res)
   res.json({ success: true, user: dbManager.getUser(userId) });
 });
 
+// Periodic matchmaking interval (every 2 seconds)
+setInterval(() => {
+  if (MATCHING_QUEUE.length >= 2) {
+    searchMatches();
+  }
+}, 2000);
+
 // Auto-approval interval (20 minutes)
 setInterval(() => {
   const users = dbManager.getUsers();
@@ -1575,11 +1612,11 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
             filters: data?.filters || {}
           });
 
-          if (MATCHING_QUEUE.length <= 1) {
-            ws.send(JSON.stringify({ event: 'match:none', data: { message: 'No users are currently available.' } }));
-            MATCHING_QUEUE = MATCHING_QUEUE.filter(c => c.userId !== userId);
-          } else {
-            ws.send(JSON.stringify({ event: 'match:searching', data: {} }));
+          // Always send searching state to the candidate. They remain in queue until a match is found.
+          ws.send(JSON.stringify({ event: 'match:searching', data: {} }));
+
+          // Attempt an immediate match when another candidate is present
+          if (MATCHING_QUEUE.length > 1) {
             searchMatches();
           }
         }

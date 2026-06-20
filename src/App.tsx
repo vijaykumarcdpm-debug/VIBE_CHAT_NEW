@@ -438,6 +438,9 @@ export default function App() {
     peerPic: string;
     isCaller: boolean;
     type: 'audio' | 'video';
+    peerCity?: string;
+    peerState?: string;
+    peerCountry?: string;
   } | null>(null);
 
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
@@ -445,10 +448,23 @@ export default function App() {
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Allow quit if explicitly confirmed
+      if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
+        window.sessionStorage.removeItem('vibe_allow_quit');
+        return;
+      }
+
+      // Prevent unload if in active call or main lobby
       if (activeCall || incomingCall) {
         e.preventDefault();
         e.returnValue = 'You are in an active session. Are you sure you want to leave?';
         return e.returnValue;
+      }
+
+      // Also prevent exiting from main lobby without confirmation
+      if (screen === 'lobby' && sidebarTab === 'people' && !showExitConfirm) {
+        // Don't always show the browser's beforeunload dialog, but ensure our modal will be shown
+        // The Android back button handler will set showExitConfirm, so we just need to wait
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -523,6 +539,48 @@ export default function App() {
       window.removeEventListener('popstate', handlePopState);
     };
   }, [activeCall, incomingCall, screen, sidebarTab, showThemeModal, showOwnProfileModal, showNotificationsDropdown, showExitConfirm]);
+
+  // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
+  // This handler MUST mark events as handled to prevent app exit
+  useEffect(() => {
+    const handleAndroidBack = (evt: Event) => {
+      const customEvent = evt as CustomEvent;
+      
+      // FIRST: Check app-level state and exit confirmation
+      if (showExitConfirm) {
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
+        return;
+      }
+
+      if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
+        return;
+      }
+
+      if (activeCall || incomingCall) {
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
+        return;
+      }
+
+      // If not at main lobby, handle screen transitions
+      if (screen !== 'lobby' || sidebarTab !== 'people') {
+        window.sessionStorage.setItem('vibe_back_handled', 'true');
+        return;
+      }
+
+      // At main lobby: let child components handle modals first
+      // If nothing handles it in the next frame, show exit confirmation
+      setTimeout(() => {
+        if (window.sessionStorage.getItem('vibe_back_handled') !== 'true') {
+          setShowExitConfirm(true);
+        }
+        window.sessionStorage.removeItem('vibe_back_handled');
+      }, 50);
+    };
+
+    window.addEventListener('app_hardware_back', handleAndroidBack as EventListener);
+    return () => window.removeEventListener('app_hardware_back', handleAndroidBack as EventListener);
+  }, [showExitConfirm, showThemeModal, showOwnProfileModal, showNotificationsDropdown, activeCall, incomingCall, screen, sidebarTab]);
 
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
@@ -973,7 +1031,10 @@ export default function App() {
             peerName: data.peerName,
             peerPic: data.peerPic,
             isCaller: !!data.isCaller,
-            type: data.type || 'audio'
+            type: data.type || 'audio',
+            peerCity: data.peerCity,
+            peerState: data.peerState,
+            peerCountry: data.peerCountry
           });
           setIncomingCall(null);
           setOutgoingCall(null);
@@ -1286,6 +1347,13 @@ export default function App() {
     showToast('Call Session Ended');
   };
 
+  const handleNextStranger = () => {
+    setActiveCall(null);
+    // Trigger ChatInterface to search for next match
+    const event = new CustomEvent('app:next_match', { detail: {} });
+    window.dispatchEvent(event);
+  };
+
   const [vipScrollToPlans, setVipScrollToPlans] = useState<boolean>(false);
 
   const triggerVipPage = () => {
@@ -1328,6 +1396,11 @@ export default function App() {
               isCaller={activeCall.isCaller}
               callType={activeCall.type}
               onHangup={handleHangupCall}
+              onOpenChat={() => setSidebarTab('chat')}
+              peerCity={activeCall.peerCity}
+              peerState={activeCall.peerState}
+              peerCountry={activeCall.peerCountry}
+              onNextMatch={handleNextStranger}
             />
           </div>
         </div>
