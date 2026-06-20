@@ -303,7 +303,7 @@ export default function AudioVideoCall({
   return (
     <div
       ref={containerRef}
-      className={`relative flex flex-col items-center justify-center w-full min-h-[500px] h-[100dvh] md:h-[620px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
+      className={`relative flex flex-col items-center justify-center w-full h-full min-h-[420px] md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
         isFullscreen ? 'h-screen rounded-none border-none' : ''
       }`}
     >
@@ -365,32 +365,29 @@ export default function AudioVideoCall({
 
       {/* VIDEO / CANVAS INTERACTIVE DISPLAY GRID */}
       {callType === 'video' ? (
-        <div className="absolute inset-0 w-full h-full bg-slate-900">
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-slate-900">
           {/* Main Remote Feed Area */}
-          <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
-             <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                style={{ transform: 'none' }}
-                className="w-full h-full object-cover"
-              />
-            
+          <div className="relative w-full h-full max-w-full max-h-full">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              style={{ transform: 'none' }}
+              className="w-full h-full object-cover"
+            />
+
             {/* User Label overlay */}
-            <div className="absolute top-4 left-4 bg-slate-950/80 rounded-3xl border border-slate-800 px-4 py-3 text-left max-w-[calc(100%-2rem)]">
-            <div className="text-sm font-bold text-white">{peerName}</div>
-            {(peerCity || peerState) && (
-              <div className="text-[10px] text-slate-300 mt-1">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</div>
-            )}
-          </div>
-          <div className="absolute bottom-20 left-4 px-3 py-1 bg-slate-950/80 rounded-lg text-xs font-semibold text-white border border-slate-800">
-              {peerName}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-950/80 rounded-3xl border border-slate-800 px-4 py-3 text-center max-w-[calc(100%-2rem)]">
+              <div className="text-sm font-bold text-white">{peerName}</div>
+              {(peerCity || peerState) && (
+                <div className="text-[10px] text-slate-300 mt-1">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</div>
+              )}
             </div>
           </div>
 
           {/* Picture-In-Picture Local Feed Window */}
           {!isVideoOff && !errorMsg && (
-            <div className="absolute top-4 right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
                 <video
                   ref={localVideoRef}
                   autoPlay
@@ -407,7 +404,7 @@ export default function AudioVideoCall({
         </div>
       ) : (
         /* AUDIO ONLY CALL PULSING CARD */
-        <div className="relative flex flex-col items-center justify-center p-12 text-center w-full h-full bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950/20">
+        <div className="relative flex flex-col items-center justify-center p-6 sm:p-12 text-center w-full h-full bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950/20">
           <audio
             ref={remoteAudioRef}
             autoPlay
@@ -446,7 +443,7 @@ export default function AudioVideoCall({
       )}
 
       {/* INTERACTIVE CONTROLS BAR */}
-      <div className="absolute bottom-6 flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-wrap w-fit max-w-[95%] z-20 mx-auto">
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-wrap w-fit max-w-[95%] z-20">
         {/* Toggle Audio Mute */}
         <button
           onClick={toggleMute}

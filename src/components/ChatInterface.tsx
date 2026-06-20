@@ -100,8 +100,25 @@ export default function ChatInterface({
   const [inspectedPeer, setInspectedPeer] = useState<any | null>(null);
 
   const openModal = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
-    window.history.pushState({ vibe_app: true, modalOpen: true }, "");
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState({ vibe_app: true, modalOpen: true }, "");
+      } catch (e) {}
+    }
     setter(value);
+  };
+
+  const replaceAppGuardHistory = () => {
+    if (typeof window !== 'undefined' && window.history.state?.modalOpen) {
+      try {
+        window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+      } catch (e) {}
+    }
+  };
+
+  const closeModalWithHistory = (closer: () => void) => {
+    replaceAppGuardHistory();
+    closer();
   };
 
   useEffect(() => {
@@ -618,7 +635,7 @@ export default function ChatInterface({
       }
 
       if (fullScreenImage) {
-        setFullScreenImage(null);
+        closeModalWithHistory(() => setFullScreenImage(null));
         markBackHandled();
         return;
       }
@@ -658,18 +675,20 @@ export default function ChatInterface({
         return;
       }
       if (showReportDialog) {
-        setShowReportDialog(false);
+        closeModalWithHistory(() => setShowReportDialog(false));
         markBackHandled();
         return;
       }
       if (showThemeModal) {
-        setShowThemeModal(false);
+        closeModalWithHistory(() => setShowThemeModal(false));
         markBackHandled();
         return;
       }
       if (inspectedPeer) {
-        setInspectedPeer(null);
-        setIsAdminEditing(false);
+        closeModalWithHistory(() => {
+          setInspectedPeer(null);
+          setIsAdminEditing(false);
+        });
         markBackHandled();
         return;
       }
@@ -2096,7 +2115,7 @@ export default function ChatInterface({
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setShowReportDialog(false); setReportReason(''); }}
+                      onClick={() => closeModalWithHistory(() => { setShowReportDialog(false); setReportReason(''); })}
                       className={`w-1/2 py-2 rounded-lg transition font-medium text-xs ${theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`}
                     >
                       Cancel
@@ -2620,10 +2639,10 @@ export default function ChatInterface({
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100">
           <div className={`mx-auto w-full max-w-sm max-h-[calc(100vh-4rem)] border rounded-3xl p-6 relative overflow-y-auto min-h-0 shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
             <button
-              onClick={() => {
+              onClick={() => closeModalWithHistory(() => {
                 setInspectedPeer(null);
                 setIsAdminEditing(false);
-              }}
+              })}
               className={`absolute top-4 right-4 text-lg p-1 cursor-pointer transition z-10 ${theme === 'light' ? 'text-slate-600 hover:text-slate-900' : 'text-slate-200 hover:text-white'}`}
             >
               ✕
@@ -2636,7 +2655,7 @@ export default function ChatInterface({
                   <h4 className="text-xs font-black text-violet-400 uppercase tracking-widest">⚙️ Admin Profile Edit</h4>
                   <button 
                     type="button" 
-                    onClick={() => setIsAdminEditing(false)} 
+                    onClick={() => closeModalWithHistory(() => setIsAdminEditing(false))} 
                     className="text-[10px] text-slate-200 hover:text-rose-400 uppercase font-bold"
                   >
                     Cancel
@@ -2897,7 +2916,7 @@ export default function ChatInterface({
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
-              onClick={() => setShowThemeModal(false)}
+              onClick={() => closeModalWithHistory(() => setShowThemeModal(false))}
               className={`absolute top-6 right-6 p-2 z-10 cursor-pointer ${theme === 'light' ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-200'}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -3068,7 +3087,7 @@ export default function ChatInterface({
           <div className="relative mx-auto w-full max-w-3xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950 min-h-0">
             <button
               type="button"
-              onClick={() => setFullScreenImage(null)}
+              onClick={() => closeModalWithHistory(() => setFullScreenImage(null))}
               className="absolute top-4 right-4 z-20 p-3 rounded-2xl bg-slate-900/90 text-white hover:bg-slate-800 transition"
             >
               <X className="w-5 h-5" />

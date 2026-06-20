@@ -1508,7 +1508,7 @@ export default function App() {
 
       {incomingCall && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
-          <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+          <div className={`p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
             <div className="relative mx-auto w-16 h-16">
               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
               <img
@@ -1554,7 +1554,7 @@ export default function App() {
 
       {outgoingCall && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
-          <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+          <div className={`p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
             <div className="relative mx-auto w-16 h-16">
               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
               <img
@@ -2254,7 +2254,7 @@ export default function App() {
 
       {showExitConfirm && (
         <div className={`fixed inset-0 backdrop-blur-md z-[200] overflow-y-auto touch-pan-y p-4 text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
-          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90vh] space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
             <div className="text-4xl mb-2">🚪</div>
             <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
               Are you sure you want to quit?

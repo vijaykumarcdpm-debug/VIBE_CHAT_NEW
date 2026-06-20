@@ -80,25 +80,49 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
     isBanned: boolean;
   } | null>(null);
 
-  useEffect(() => {
-    if (editingUser) {
-      setEditForm({
-        id: editingUser.id,
-        username: editingUser.username || '',
-        bio: editingUser.bio || '',
-        gender: (editingUser.gender as any) || 'Other',
-        age: Number(editingUser.age) || 18,
-        city: editingUser.city || '',
-        state: editingUser.state || '',
-        country: editingUser.country || '',
-        type: editingUser.type,
-        profilePic: editingUser.profilePic || '',
-        isBanned: !!editingUser.isBanned,
-      });
-    } else {
-      setEditForm(null);
+  const closeAdminModal = () => {
+    if (typeof window !== 'undefined' && window.history.state?.modalOpen) {
+      try {
+        window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+      } catch (e) {}
     }
-  }, [editingUser]);
+    setInspectingVerificationPhoto(null);
+    setEditingUser(null);
+  };
+
+  const openAdminModal = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState({ vibe_app: true, modalOpen: true }, "");
+      } catch (e) {}
+    }
+    setter(value);
+  };
+
+  useEffect(() => {
+    if (inspectingVerificationPhoto || editingUser) {
+      if (typeof window !== 'undefined' && window.history.state?.modalOpen !== true) {
+        try {
+          window.history.pushState({ vibe_app: true, modalOpen: true }, "");
+        } catch (e) {}
+      }
+    }
+  }, [inspectingVerificationPhoto, editingUser]);
+
+  useEffect(() => {
+    function handleAppHardwareBack(evt: any) {
+      if (inspectingVerificationPhoto || editingUser) {
+        closeAdminModal();
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+        if (evt && typeof evt === 'object') {
+          try { evt.detail = evt.detail || {}; evt.detail.handled = true; } catch (e) {}
+        }
+      }
+    }
+
+    window.addEventListener('app_hardware_back', handleAppHardwareBack as EventListener);
+    return () => window.removeEventListener('app_hardware_back', handleAppHardwareBack as EventListener);
+  }, [inspectingVerificationPhoto, editingUser]);
 
   const handleAdminAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -704,7 +728,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                                       VERIFIED ✔
                                       {u.humanVerificationPic && (
                                         <button 
-                                          onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: u.humanVerificationPic || '' })}
+                                          onClick={() => openAdminModal(setInspectingVerificationPhoto, { userId: u.id, pic: u.humanVerificationPic || '' })}
                                           className="hover:scale-110 transition cursor-pointer text-[12px] p-0 border-none bg-transparent"
                                           title="View Verification Photo"
                                         >
@@ -718,7 +742,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                                       PENDING
                                       {u.humanVerificationPic && (
                                         <button 
-                                          onClick={() => setInspectingVerificationPhoto({ userId: u.id, pic: u.humanVerificationPic || '' })}
+                                          onClick={() => openAdminModal(setInspectingVerificationPhoto, { userId: u.id, pic: u.humanVerificationPic || '' })}
                                           className="hover:scale-110 transition cursor-pointer text-[12px] p-0 border-none bg-transparent"
                                           title="Verify Photo"
                                         >
@@ -792,7 +816,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                                 )
                               )}
                               <button
-                                onClick={() => setEditingUser(u)}
+                                onClick={() => openAdminModal(setEditingUser, u)}
                                 className="px-2.5 py-1 bg-violet-600/15 border border-violet-500/20 hover:bg-violet-600/25 text-violet-400 font-semibold rounded-lg text-[10px] transition cursor-pointer"
                               >
                                 Edit Profile
@@ -1308,7 +1332,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
             </div>
 
             <button
-               onClick={() => setInspectingVerificationPhoto(null)}
+               onClick={closeAdminModal}
               className={`mt-2 w-full py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider transition cursor-pointer ${
                 theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
               }`}
@@ -1478,7 +1502,7 @@ export default function AdminPanel({ onBack, onChatAsAdmin, token, theme }: Admi
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingUser(null)}
+                  onClick={closeAdminModal}
                   className={`flex-1 py-2.5 font-bold rounded-xl text-xs uppercase tracking-wider transition border cursor-pointer ${
                     theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                   }`}

@@ -44,10 +44,7 @@ export default function VipPlansPage({
   useEffect(() => {
     function handleAppHardwareBack(evt: any) {
       if (selectedPlan) {
-        setSelectedPlan(null);
-        setScreenshot('');
-        setScreenshotName('');
-        setUploadError('');
+        closeSelectedPlan();
         try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         if (evt && typeof evt === 'object') {
           try { evt.detail = evt.detail || {}; evt.detail.handled = true; } catch (e) {}
@@ -92,6 +89,27 @@ export default function VipPlansPage({
       setUploadError('Failed to read image script. Try another image.');
     };
     reader.readAsDataURL(file);
+  };
+
+  const openSelectedPlan = (plan: VIPPlan) => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState({ vibe_app: true, modalOpen: true }, "");
+      } catch (e) {}
+    }
+    setSelectedPlan(plan);
+  };
+
+  const closeSelectedPlan = () => {
+    if (typeof window !== 'undefined' && window.history.state?.modalOpen) {
+      try {
+        window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+      } catch (e) {}
+    }
+    setSelectedPlan(null);
+    setScreenshot('');
+    setScreenshotName('');
+    setUploadError('');
   };
 
   const handleSubmit = async () => {
@@ -268,7 +286,7 @@ export default function VipPlansPage({
             return (
               <button
                 key={pl.id}
-                onClick={() => { try { window.history.pushState({ vibe_app: true, modalOpen: true }, ""); } catch (e) {} setSelectedPlan(pl); setSubmissionSuccess(false); }}
+                onClick={() => { openSelectedPlan(pl); setSubmissionSuccess(false); }}
                 className={`plan-duration-card plan-duration-card-bg text-left p-4 rounded-2xl border-2 transition relative duration-200 cursor-pointer ${
                   isSelected
                     ? 'border-black scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
@@ -320,7 +338,7 @@ export default function VipPlansPage({
                   Complete VIP Enrollment
                 </h2>
                 <button
-                  onClick={() => { setSelectedPlan(null); setScreenshot(''); setScreenshotName(''); setUploadError(''); }}
+                  onClick={closeSelectedPlan}
                   className={`p-2 rounded-full transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500" : "hover:bg-slate-800 text-slate-400"}`}
                 >
                   <X className="w-6 h-6" />
