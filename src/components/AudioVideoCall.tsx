@@ -69,6 +69,12 @@ export default function AudioVideoCall({
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const signalQueue = useRef<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const correctionRefs = useRef<{
+    canvas?: HTMLCanvasElement;
+    video?: HTMLVideoElement;
+    raf?: number;
+    correctedStream?: MediaStream;
+  } | null>(null);
 
   const defaultAvatarDataUrl = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`;
   const peerImageSrc = (peerPic && peerPic.trim()) ? peerPic : defaultAvatarDataUrl;
@@ -146,6 +152,22 @@ export default function AudioVideoCall({
       if (activeStream) {
         activeStream.getTracks().forEach((track) => track.stop());
       }
+      // stop any corrected/canvas-based streams and resources
+      if (correctionRefs.current) {
+        try {
+          correctionRefs.current.correctedStream?.getTracks().forEach(t => t.stop());
+          if (correctionRefs.current.raf) cancelAnimationFrame(correctionRefs.current.raf);
+          if (correctionRefs.current.video) {
+            try { correctionRefs.current.video.pause(); } catch(e) {}
+            correctionRefs.current.video.srcObject = null;
+          }
+          correctionRefs.current.canvas = undefined;
+          correctionRefs.current.video = undefined;
+          correctionRefs.current.correctedStream = undefined;
+        } catch (e) {
+          console.warn('Error cleaning correction refs', e);
+        }
+      }
       if (pcRef.current) {
         pcRef.current.close();
       }
@@ -195,8 +217,72 @@ export default function AudioVideoCall({
     const pc = new RTCPeerConnection(configuration);
     pcRef.current = pc;
 
-    stream.getTracks().forEach((track) => {
-      pc.addTrack(track, stream);
+    // By default send the raw getUserMedia stream.
+    // However some front-facing cameras may present mirrored frames from the device.
+    // Ensure the outgoing stream is NOT mirrored: for front camera, draw video to a hidden canvas
+    // with a flip and captureStream() to produce an unmirrored stream for transmission.
+    let outgoingStream: MediaStream = stream;
+
+    if (callType === 'video' && facingMode === 'user' && stream.getVideoTracks().length > 0) {
+      try {
+        const hiddenVideo = document.createElement('video');
+        hiddenVideo.muted = true;
+        hiddenVideo.autoplay = true;
+        hiddenVideo.playsInline = true;
+        hiddenVideo.srcObject = stream;
+
+        // attempt to determine size from track settings
+        const settings = stream.getVideoTracks()[0].getSettings();
+        const width = (settings && (settings.width as number)) || 640;
+        const height = (settings && (settings.height as number)) || 480;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        const drawFrame = () => {
+          try {
+            if (!ctx) return;
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // flip horizontally to unmirror source
+            ctx.scale(-1, 1);
+            ctx.drawImage(hiddenVideo, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
+          } catch (e) {
+            // drawing may fail early while video metadata loads
+          }
+          correctionRefs.current && (correctionRefs.current.raf = requestAnimationFrame(drawFrame));
+        };
+
+        // ensure video plays so drawImage has frames
+        hiddenVideo.addEventListener('loadedmetadata', () => {
+          hiddenVideo.play().catch(() => {});
+          drawFrame();
+        });
+
+        // start attempting to play immediately (some browsers already have frames)
+        hiddenVideo.play().catch(() => {});
+
+        const corrected = (canvas as any).captureStream ? (canvas as any).captureStream(25) as MediaStream : null;
+        if (corrected) {
+          // include audio tracks from original stream
+          stream.getAudioTracks().forEach(t => corrected.addTrack(t));
+          outgoingStream = corrected;
+          correctionRefs.current = { canvas, video: hiddenVideo, raf: 0, correctedStream: corrected };
+        } else {
+          // fallback: keep original stream
+          correctionRefs.current = null;
+        }
+      } catch (e) {
+        console.warn('Failed to create corrected outgoing stream, sending raw stream', e);
+        correctionRefs.current = null;
+      }
+    }
+
+    outgoingStream.getTracks().forEach((track) => {
+      pc.addTrack(track, outgoingStream);
     });
 
     pc.ontrack = (event) => {

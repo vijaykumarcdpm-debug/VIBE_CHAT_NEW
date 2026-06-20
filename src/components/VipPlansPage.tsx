@@ -329,8 +329,8 @@ export default function VipPlansPage({
       </div>
 
       {selectedPlan && (
-        <div className={`fixed inset-0 z-[100] overflow-y-auto touch-pan-y p-4 backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
-          <div className={`mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
+        <div className={`modal-overlay z-[100] backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
+          <div className={`mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] modal-card rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
             <div className="h-full min-h-0 overflow-y-auto p-6 sm:p-8">
               {/* Modal Header */}
               <div className="flex justify-between items-center mb-6">

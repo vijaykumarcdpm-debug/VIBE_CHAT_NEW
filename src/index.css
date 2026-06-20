@@ -43,6 +43,43 @@
   .glow-cyan {
     box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
   }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    z-index: 50;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-height: calc(100dvh - 4rem);
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-card-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-card-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .plan-duration-card, .plan-duration-card * {

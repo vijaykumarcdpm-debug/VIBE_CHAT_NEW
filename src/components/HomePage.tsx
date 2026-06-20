@@ -654,7 +654,7 @@ export default function HomePage({
               {/* Auth Modals */}
               {authView !== 'none' && (
                 <div 
-                  className="fixed inset-0 z-[200] overflow-y-auto touch-pan-y p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in" 
+                  className="modal-overlay z-[200] bg-slate-950/80 backdrop-blur-sm animate-fade-in" 
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
                       closeAuthModal();
@@ -662,20 +662,20 @@ export default function HomePage({
                   }}
                 >
                   <div 
-                    className={`mx-auto w-full max-w-md rounded-3xl p-6 relative overflow-y-auto min-h-0 max-h-[calc(100vh-4rem)] shadow-2xl border ${
-                      theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 text-slate-100'
+                    className={`modal-card mx-auto w-full max-w-md rounded-3xl p-6 relative ${
+                      theme === 'light' ? 'bg-white border-slate-200 border shadow-2xl text-slate-900' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-2xl'
                     }`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Guest Login Form */}
               {authView === 'guest' && (
-                <form onSubmit={handleGuestSubmit} className="space-y-4 animate-fade-in">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className={`font-bold text-base font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Configure Guest Access</h3>
-                    <button type="button" onClick={() => closeAuthModal()} className={`text-xs transition ${theme === 'light' ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'}`}>✕ Cancel</button>
-                  </div>
+                <form onSubmit={handleGuestSubmit} className="modal-card-body flex flex-col space-y-4 animate-fade-in">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className={`font-bold text-base font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Configure Guest Access</h3>
+                      <button type="button" onClick={() => closeAuthModal()} className={`text-xs transition ${theme === 'light' ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'}`}>✕ Cancel</button>
+                    </div>
 
-                  <div className="space-y-3.5">
+                    <div className="space-y-3.5">
                     <div>
                       <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1 font-display ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Enter Your Nickname</label>
                       <input
@@ -758,7 +758,6 @@ export default function HomePage({
                       </label>
                     </div>
                   </div>
-
                   <button
                     type="submit"
                     className={`w-full py-3 mt-1.5 text-white font-bold font-display tracking-wider text-xs rounded-xl transition cursor-pointer ${
@@ -776,7 +775,7 @@ export default function HomePage({
               {authView === 'login' && (
                 <div className="animate-fade-in">
                   {!showForgotForm ? (
-                    <form onSubmit={handleLoginSubmit} className="space-y-4">
+                    <form onSubmit={handleLoginSubmit} className="modal-card-body flex flex-col space-y-4">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className={`font-bold text-base font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Member Authentication</h3>
                         <button type="button" onClick={() => closeAuthModal()} className={`text-xs transition ${theme === 'light' ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'}`}>✕ Close</button>
@@ -851,7 +850,7 @@ export default function HomePage({
                       </button>
                     </form>
                   ) : (
-                    <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <form onSubmit={handleForgotPassword} className="modal-card-body flex flex-col space-y-4">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className={`font-bold text-base font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Password Recovery</h3>
                         <button type="button" onClick={() => { setShowForgotForm(false); setErrorMessage(''); }} className={`text-xs transition ${theme === 'light' ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400'}`}>✕ Return</button>
@@ -903,7 +902,7 @@ export default function HomePage({
 
               {/* Register Account Form */}
               {authView === 'register' && !showPhotoVerificationUI && (
-                <form onSubmit={handleRegisterSubmit} className="space-y-3 animate-fade-in">
+                <form onSubmit={handleRegisterSubmit} className="modal-card-body flex flex-col space-y-3 animate-fade-in">
                   <div className="flex justify-between items-center mb-1">
                     <h3 className={`font-bold text-base font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Register Profile Handle</h3>
                     <button type="button" onClick={() => closeAuthModal()} className={`text-xs transition ${theme === 'light' ? 'text-slate-500 hover:text-slate-950' : 'text-slate-400 hover:text-white'}`}>✕ Close</button>
@@ -1126,7 +1125,7 @@ export default function HomePage({
 
               {/* Photo Verification Form */}
               {authView === 'register' && showPhotoVerificationUI && (
-                <form onSubmit={handleRegisterSubmit} className="space-y-4 animate-fade-in">
+                <form onSubmit={handleRegisterSubmit} className="modal-card-body flex flex-col space-y-4 animate-fade-in">
                   <div className="flex justify-between items-center mb-1">
                     <h3 className={`font-bold text-base font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Human Verification Required</h3>
                     <button type="button" onClick={() => setShowPhotoVerificationUI(false)} className={`text-xs transition ${theme === 'light' ? 'text-slate-500 hover:text-slate-950' : 'text-slate-400 hover:text-white'}`}>✕ Go Back</button>
