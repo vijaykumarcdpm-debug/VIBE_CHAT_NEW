@@ -258,6 +258,14 @@ export default function App() {
   const sidebarTabRef = useRef<'people' | 'chat' | 'lounge' | 'vip'>('people');
   const isLoggedInRef = useRef<boolean>(!!token && !!me);
 
+  // Helper: open VIP upgrade flow when non-VIP taps a locked field
+  const handleVipFieldClick = (e?: any) => {
+    if (isUserVIP) return;
+    try { e?.preventDefault?.(); } catch (err) {}
+    try { setShowOwnProfileModal(false); } catch (err) {}
+    try { triggerVipPage(); } catch (err) {}
+  };
+
   const [notifications, setNotifications] = useState<any[]>([
     {
       id: 'notif-welcome',
@@ -1854,7 +1862,7 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>City</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <div className="relative">
+                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
                     <input
                       type="text"
                       value={editCity}
@@ -1881,7 +1889,7 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>State</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <div className="relative">
+                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
                     <input
                       type="text"
                       value={editState}
@@ -1908,7 +1916,7 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Country</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <div className="relative">
+                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
                     <input
                       type="text"
                       value={editCountry}

@@ -81,8 +81,10 @@ export default function AudioVideoCall({
 
   const processSignal = async (signal: any, pc: RTCPeerConnection) => {
     try {
+      // Accept either full SDP blocks or ICE candidates
       if (signal.sdp) {
         await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        // If remote is an offer, generate an answer
         if (pc.remoteDescription?.type === 'offer') {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -94,7 +96,12 @@ export default function AudioVideoCall({
           }
         }
       } else if (signal.candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        } catch (e) {
+          // Some browsers may emit null candidates or duplicates; guard and log
+          console.warn('Ignored invalid ICE candidate', e);
+        }
       }
     } catch (err) {
       console.warn('Error processing signal:', err);
@@ -181,15 +188,20 @@ export default function AudioVideoCall({
     const handleSignaling = (e: MessageEvent) => {
       try {
         const { event, data } = JSON.parse(e.data);
-        if (event === 'webrtc:signal' && data.senderId === peerId) {
-          const { signal } = data;
-          
-          if (pcRef.current) {
-            processSignal(signal, pcRef.current);
-          } else {
-            signalQueue.current.push(signal);
+        if (event === 'webrtc:signal') {
+          // tolerate multiple server payload shapes for sender id
+          const senderId = data?.senderId || data?.callerId || data?.from || data?.sender || data?.ownerId;
+          const targetId = data?.targetId || data?.recipientId;
+          // If this message is from our peer or targeted to us, process it
+          if (senderId === peerId || targetId === userId || (senderId && peerId && senderId === peerId)) {
+            const { signal } = data;
+            if (pcRef.current) {
+              processSignal(signal, pcRef.current);
+            } else {
+              signalQueue.current.push(signal);
+            }
           }
-        } else if (event === 'call:hangup' && data.senderId === peerId) {
+        } else if (event === 'call:hangup' && (data.senderId === peerId || data.callerId === peerId || data.from === peerId)) {
           setCallStatus('Finished');
           setTimeout(() => {
             onHangup();

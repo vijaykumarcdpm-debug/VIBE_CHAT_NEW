@@ -618,23 +618,36 @@ export default function ChatInterface({
     });
   };
 
-  const clearUnreadForPeer = async (peerId: string, markOnServer: boolean = false) => {
-    setRecents(prev => prev.map(r => r.peerId === peerId ? { ...r, unreadCount: 0 } : r));
-    if (markOnServer && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ event: 'chat:mark_read', data: { peerId } }));
-    }
-  };
+  useEffect(() => {
+    if (!me) return;
+    setOnlineUsers(prev => {
+      if (prev.some((u) => u.id === me.id)) return prev;
+      return [{
+        id: me.id,
+        username: me.username,
+        gender: me.gender,
+        type: me.type,
+        profilePic: me.profilePic,
+        city: me.city,
+        state: me.state,
+        country: me.country,
+        bio: me.bio || '',
+        online: true
+      }, ...prev];
+    });
+  }, [me]);
 
   const partnerOnline = Boolean(
     activePartner?.online === true ||
-    isUserOnline(activePartner?.id)
+    (activePartner?.id ? isUserOnline(activePartner.id) : false)
   );
-  const partnerInSameConversation = Boolean(activePartner && partnerFocused);
+  const partnerInSameConversation = chatIsActive && !!activePartner;
   const partnerStatusDotClass = partnerInSameConversation
     ? 'bg-amber-400'
     : partnerOnline
       ? 'bg-emerald-500'
       : 'bg-rose-500';
+
   const partnerStatusTextClass = partnerInSameConversation
     ? 'text-amber-400'
     : partnerOnline
@@ -781,6 +794,27 @@ export default function ChatInterface({
     }
   };
 
+  const clearUnreadForPeer = async (peerId: string, updateLocal: boolean = false) => {
+    if (!peerId) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (updateLocal) {
+        setRecents(prev => prev.map(r => r.peerId === peerId ? { ...r, unreadCount: 0 } : r));
+      }
+      return;
+    }
+
+    try {
+      ws.send(JSON.stringify({
+        event: 'chat:mark_read',
+        data: { peerId }
+      }));
+      if (updateLocal) {
+        setRecents(prev => prev.map(r => r.peerId === peerId ? { ...r, unreadCount: 0 } : r));
+      }
+    } catch (err) {
+      console.error('Failed to clear unread for peer:', err);
+    }
+  };
 
 
   // Scroll message thread to bottom
@@ -1003,22 +1037,25 @@ export default function ChatInterface({
           deliveryStatus: (msg.senderId === me.id ? (msg.read ? 'read' : 'delivered') : undefined) as 'delivered' | 'read' | undefined
         }));
         setHistoryMessages(normalized);
-        const partnerIsOnline = onlineUsers.some((u) => u.id === peer.id);
-        setActivePartner({ ...(peer as any), online: (peer as any).online ?? partnerIsOnline });
-        setPartnerFocused(false);
-        setChatState('direct');
-        setSystemAlert(null);
-        // Immediately clear unread indicator for this peer and sync with the server
-        await clearUnreadForPeer(peer.id, true);
-        await fetchSideData(true); // force server sync so unread badge resets immediately
       } else {
-        const errData = await res.json();
-        if (errData.isLocked) {
+        const errData = await res.json().catch(() => null);
+        if (errData?.isLocked) {
           onTriggerVipPage();
-        } else {
-          console.error(errData.error);
+          return;
         }
+        console.warn('Could not fetch conversation history; opening chat pane anyway.', errData);
+        setHistoryMessages([]);
       }
+
+      const partnerIsOnline = onlineUsers.some((u) => u.id === peer.id);
+      setActivePartner({ ...(peer as any), online: (peer as any).online ?? partnerIsOnline });
+      setPartnerFocused(false);
+      setSidebarTab('chat');
+      setChatState('direct');
+      setSystemAlert(null);
+      // Immediately clear unread indicator for this peer and sync with the server
+      await clearUnreadForPeer(peer.id, true);
+      await fetchSideData(true); // force server sync so unread badge resets immediately
     } catch (e) {
       console.error(e);
     }
@@ -1500,9 +1537,25 @@ export default function ChatInterface({
       allKnownUsers.set(ou.id, { ...ou, online: true, bio: ou.bio || ou.description || '' });
     });
 
+    if (me && !allKnownUsers.has(me.id)) {
+      allKnownUsers.set(me.id, {
+        id: me.id,
+        username: me.username,
+        gender: me.gender,
+        type: me.type,
+        profilePic: me.profilePic,
+        city: me.city || '',
+        state: me.state || '',
+        country: me.country || '',
+        bio: me.bio || '',
+        online: true,
+        lastSeenAt: me.lastSeenAt
+      });
+    }
+
     // Offline users only appear in search
     const mergedUsers = Array.from(allKnownUsers.values())
-      .filter(ou => (me.type === 'Admin' || ou.id !== me.id) && !me.blockedUsers?.includes(ou.id))
+      .filter(ou => !me.blockedUsers?.includes(ou.id))
       .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
 
     return mergedUsers
@@ -1779,7 +1832,13 @@ export default function ChatInterface({
                         return (
                           <div key={ou.id} className="flex items-center justify-between group">
                             <button
-                              onClick={() => handleOpenConversation(ou)}
+                              onClick={() => {
+                                if (ou.id === me.id) {
+                                  openModal(setInspectedPeer, ou);
+                                  return;
+                                }
+                                handleOpenConversation(ou);
+                              }}
                               className={`flex-grow text-left p-4 sm:p-5 lg:p-6 rounded-2xl transition flex items-center gap-4 cursor-pointer border ${
                                 activeState 
                                   ? (theme === 'light' ? 'bg-sky-50 border-sky-100 text-sky-950 font-bold' : 'bg-slate-800 text-white border-violet-500/30') 
