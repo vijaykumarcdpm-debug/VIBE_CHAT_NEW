@@ -256,6 +256,7 @@ export default function App() {
   const activeCallRef = useRef<any>(null);
   const screenRef = useRef<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
   const sidebarTabRef = useRef<'people' | 'chat' | 'lounge' | 'vip'>('people');
+  const isLoggedInRef = useRef<boolean>(!!token && !!me);
 
   const [notifications, setNotifications] = useState<any[]>([
     {
@@ -423,6 +424,7 @@ export default function App() {
     activeCallRef.current = activeCall;
     screenRef.current = screen;
     sidebarTabRef.current = sidebarTab;
+    isLoggedInRef.current = !!token && !!me;
   }, [
     showThemeModal,
     showOwnProfileModal,
@@ -432,7 +434,9 @@ export default function App() {
     outgoingCall,
     activeCall,
     screen,
-    sidebarTab
+    sidebarTab,
+    token,
+    me
   ]);
 
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
@@ -461,11 +465,13 @@ export default function App() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    if (!isVibeAppState(window.history.state)) {
-      pushAppRootState();
-      pushAppGuardState();
-    } else if (!window.history.state.appGuard) {
-      pushAppGuardState();
+    if (isLoggedInRef.current) {
+      if (!isVibeAppState(window.history.state)) {
+        pushAppRootState();
+        pushAppGuardState();
+      } else if (!window.history.state.appGuard) {
+        pushAppGuardState();
+      }
     }
 
     const restoreAppGuard = () => {
@@ -488,8 +494,14 @@ export default function App() {
 
       const currentState = e.state;
       const isAppState = isVibeAppState(currentState);
-      restoreAppGuard();
       if (!isAppState) {
+        if (isLoggedInRef.current && screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
+          setShowExitConfirm(true);
+        }
+        if (!isLoggedInRef.current) {
+          return;
+        }
+        restoreAppGuard();
         return;
       }
 
@@ -536,6 +548,10 @@ export default function App() {
           return;
         }
 
+        if (!isLoggedInRef.current) {
+          return;
+        }
+
         if (screenRef.current !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
@@ -562,6 +578,21 @@ export default function App() {
       window.removeEventListener('popstate', handlePopState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!token || !me) return;
+    if (screen === 'lobby' && sidebarTab === 'people') {
+      try {
+        if (window.history.state?.vibe_app === true) {
+          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+        } else {
+          window.history.pushState({ vibe_app: true, appGuard: true }, '');
+        }
+      } catch (err) {
+        console.warn('Unable to preserve app history guard for People Lobby:', err);
+      }
+    }
+  }, [screen, sidebarTab, token, me]);
 
   // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
   // This handler MUST mark events as handled to prevent app exit
@@ -1536,33 +1567,35 @@ export default function App() {
 
       {incomingCall && (
         <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
-          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
-            <div className="relative mx-auto w-16 h-16">
-              <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
-              <img
-                src={incomingCall.callerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
-                alt={incomingCall.callerName}
-                className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
-                referrerPolicy="no-referrer"
-              />
+          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+            <div className="modal-card-body">
+              <div className="relative mx-auto w-16 h-16">
+                <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+                <img
+                  src={incomingCall.callerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+                  alt={incomingCall.callerName}
+                  className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <div>
+                {incomingCall.breakthrough && (
+                  <div className="absolute top-2 left-0 w-full flex justify-center -mt-6">
+                    <span className="bg-amber-500 text-[9px] font-black tracking-widest text-white uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1 mx-auto w-max">
+                      <Sparkles className="w-3 h-3" /> VIP Breakthrough
+                    </span>
+                  </div>
+                )}
+                <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{incomingCall.callerName}</h3>
+                <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
+                  <Volume2 className="w-3.5 h-3.5 animate-bounce" />
+                  Incoming {incomingCall.type} Call
+                </p>
+              </div>
             </div>
 
-            <div>
-              {incomingCall.breakthrough && (
-                <div className="absolute top-2 left-0 w-full flex justify-center -mt-6">
-                  <span className="bg-amber-500 text-[9px] font-black tracking-widest text-white uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1 mx-auto w-max">
-                    <Sparkles className="w-3 h-3" /> VIP Breakthrough
-                  </span>
-                </div>
-              )}
-              <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{incomingCall.callerName}</h3>
-              <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
-                <Volume2 className="w-3.5 h-3.5 animate-bounce" />
-                Incoming {incomingCall.type} Call
-              </p>
-            </div>
-
-            <div className="flex gap-2">
+            <div className="modal-card-footer flex gap-2">
               <button
                 onClick={handleAcceptCall}
                 className="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition cursor-pointer"
@@ -1582,26 +1615,28 @@ export default function App() {
 
       {outgoingCall && (
         <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
-          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
-            <div className="relative mx-auto w-16 h-16">
-              <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
-              <img
-                src={outgoingCall.targetPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
-                alt={outgoingCall.targetName}
-                className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
-                referrerPolicy="no-referrer"
-              />
+          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+            <div className="modal-card-body">
+              <div className="relative mx-auto w-16 h-16">
+                <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+                <img
+                  src={outgoingCall.targetPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+                  alt={outgoingCall.targetName}
+                  className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <div>
+                <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{outgoingCall.targetName}</h3>
+                <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
+                  <Phone className="w-3.5 h-3.5 animate-pulse" />
+                  Calling...
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{outgoingCall.targetName}</h3>
-              <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
-                <Phone className="w-3.5 h-3.5 animate-pulse" />
-                Calling...
-              </p>
-            </div>
-
-            <div>
+            <div className="modal-card-footer">
               <button
                 onClick={() => setOutgoingCall(null)}
                 className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-lg"
@@ -2286,34 +2321,39 @@ export default function App() {
 
       {showExitConfirm && (
         <div className={`modal-overlay text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
-          <div className={`modal-card mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90vh] space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
-            <div className="text-4xl mb-2">🚪</div>
-            <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
-              Are you sure you want to quit?
-            </h3>
-            <p className={`text-sm mb-6 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
-              You are about to exit the application.
-            </p>
-            <div className="flex gap-3 justify-center select-none">
-              <button
-                onClick={() => setShowExitConfirm(false)}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition ${theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
-              >
-                No, Stay
-              </button>
-              <button
-                onClick={() => {
-                  setShowExitConfirm(false);
-                  handleLogout();
-                }}
-                className="flex-1 py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition"
-              >
-                Yes, Quit
-              </button>
+          <div className={`modal-card mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90vh] space-y-6 shadow-2xl relative min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+            <div className="modal-card-body">
+              <div className="text-4xl mb-2">🚪</div>
+              <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
+                Are you sure you want to quit?
+              </h3>
+              <p className={`text-sm mb-6 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
+                You are about to exit the application.
+              </p>
+            </div>
+            <div className="modal-card-footer">
+              <div className="flex gap-3 justify-center select-none">
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition ${theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
+                >
+                  No, Stay
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitConfirm(false);
+                    handleLogout();
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition"
+                >
+                  Yes, Quit
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
     </div>
   </div>
   );

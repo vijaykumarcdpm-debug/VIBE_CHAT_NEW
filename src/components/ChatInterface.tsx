@@ -2135,21 +2135,26 @@ export default function ChatInterface({
           {/* REPORT OVERLAY DIALOG */}
           {showReportDialog && (
             <div className="modal-overlay bg-slate-950/80 z-30 animate-fade-in">
-              <div className={`modal-card mx-auto p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] overflow-y-auto min-h-0 flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
-                <h4 className={`font-bold font-display text-base mb-2 shrink-0 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>File Abuse Complaint</h4>
-                <p className={`text-xs mb-4 leading-relaxed shrink-0 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
-                
-                <form onSubmit={handleReportUser} className="space-y-4 flex flex-col flex-1 min-h-0">
-                  <textarea
-                    required
-                    rows={3}
-                    value={reportReason}
-                    onChange={(e) => setReportReason(e.target.value)}
-                    placeholder="Harassment, explicit streams, spam links..."
-                    className={`w-full p-2.5 border text-xs rounded-lg focus:outline-none focus:border-rose-500 transition resize-none flex-1 ${theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950 border-slate-800 text-white"}`}
-                  />
+              <div className={`modal-card mx-auto p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] min-h-0 flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
+                <div className="modal-card-body">
+                    <h4 className={`font-bold font-display text-base mb-2 shrink-0 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>File Abuse Complaint</h4>
+                    <p className={`text-xs mb-4 leading-relaxed shrink-0 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
+
+                    <form id="reportForm" onSubmit={handleReportUser} className="space-y-4 flex flex-col flex-1 min-h-0">
+                      <textarea
+                        required
+                        rows={3}
+                        value={reportReason}
+                        onChange={(e) => setReportReason(e.target.value)}
+                        placeholder="Harassment, explicit streams, spam links..."
+                        className={`w-full p-2.5 border text-xs rounded-lg focus:outline-none focus:border-rose-500 transition resize-none flex-1 ${theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-slate-950 border-slate-800 text-white"}`}
+                      />
+                    </form>
+                </div>
+                <div className="modal-card-footer">
                   <div className="flex gap-2 shrink-0">
                     <button
+                      form="reportForm"
                       type="submit"
                       className="w-1/2 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition font-bold text-xs"
                     >
@@ -2163,7 +2168,7 @@ export default function ChatInterface({
                       Cancel
                     </button>
                   </div>
-                </form>
+                </div>
               </div>
             </div>
           )}
