@@ -422,6 +422,9 @@ export default function App() {
     isMatch?: boolean;
   } | null>(null);
 
+  // App-level realtime presence list (excludes current user when rendering)
+  const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
+
   useEffect(() => {
     showThemeModalRef.current = showThemeModal;
     showOwnProfileModalRef.current = showOwnProfileModal;
@@ -502,47 +505,66 @@ export default function App() {
 
       const currentState = e.state;
       const isAppState = isVibeAppState(currentState);
-      if (!isAppState) {
-        if (isLoggedInRef.current && screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
-          setShowExitConfirm(true);
+
+      const closeOpenOverlay = () => {
+        if (showThemeModalRef.current) {
+          setShowThemeModal(false);
+          return true;
         }
+        if (showOwnProfileModalRef.current) {
+          setShowOwnProfileModal(false);
+          return true;
+        }
+        if (showNotificationsDropdownRef.current) {
+          setShowNotificationsDropdown(false);
+          return true;
+        }
+        if (showExitConfirmRef.current) {
+          setShowExitConfirm(false);
+          return true;
+        }
+        if (incomingCallRef.current) {
+          setIncomingCall(null);
+          return true;
+        }
+        if (outgoingCallRef.current) {
+          setOutgoingCall(null);
+          return true;
+        }
+        if (activeCallRef.current) {
+          setActiveCall(null);
+          setScreen('lobby');
+          setSidebarTab('people');
+          return true;
+        }
+        return false;
+      };
+
+      if (!isAppState) {
         if (!isLoggedInRef.current) {
           return;
+        }
+
+        if (closeOpenOverlay()) {
+          restoreAppGuard();
+          return;
+        }
+
+        if (screenRef.current !== 'lobby' || sidebarTabRef.current !== 'people') {
+          setScreen('lobby');
+          setSidebarTab('people');
+          restoreAppGuard();
+          return;
+        }
+
+        if (!showExitConfirmRef.current) {
+          setShowExitConfirm(true);
         }
         restoreAppGuard();
         return;
       }
 
-      if (showThemeModalRef.current) {
-        setShowThemeModal(false);
-        return;
-      }
-      if (showOwnProfileModalRef.current) {
-        setShowOwnProfileModal(false);
-        return;
-      }
-      if (showNotificationsDropdownRef.current) {
-        setShowNotificationsDropdown(false);
-        return;
-      }
-      if (showExitConfirmRef.current) {
-        setShowExitConfirm(false);
-        return;
-      }
-
-      if (incomingCallRef.current) {
-        setIncomingCall(null);
-        return;
-      }
-      if (outgoingCallRef.current) {
-        setOutgoingCall(null);
-        return;
-      }
-
-      if (activeCallRef.current) {
-        setActiveCall(null);
-        setScreen('lobby');
-        setSidebarTab('people');
+      if (closeOpenOverlay()) {
         return;
       }
 
@@ -630,6 +652,11 @@ export default function App() {
     };
 
     const handleAndroidBack = (evt: Event) => {
+      if (!isLoggedInRef.current) {
+        // Join Gateway / unauthenticated entry should never show exit confirmation.
+        return;
+      }
+
       // If an app-level modal is open, close it immediately, mark handled, and restore history guard
       if (showExitConfirmRef.current) {
         setShowExitConfirm(false);
@@ -1250,6 +1277,36 @@ export default function App() {
     };
 
     setWs(socket);
+    // Lightweight presence listener: update App-level presence list on chat:presence events
+    socket.addEventListener('message', (ev) => {
+      try {
+        const parsed = JSON.parse((ev as MessageEvent).data);
+        const { event, data } = parsed;
+        if (event === 'chat:presence') {
+          const payload = data;
+          setPresenceUsers(prev => {
+            const existing = Array.isArray(prev) ? prev : [];
+            if (!payload || !payload.userId) return existing;
+            if (!payload.online) {
+              return existing.filter(u => u.id !== payload.userId);
+            }
+            const already = existing.some(u => u.id === payload.userId);
+            const newUser = {
+              id: payload.userId,
+              username: payload.username || payload.name || '',
+              gender: payload.gender || payload.type,
+              type: payload.type,
+              profilePic: payload.profilePic,
+              bio: payload.bio || '',
+              online: true
+            };
+            if (already) return existing.map(u => u.id === payload.userId ? { ...u, online: true, ...payload } : u);
+            return [newUser, ...existing.filter(u => u.id !== payload.userId)];
+          });
+          try { fetchStats(); } catch (e) {}
+        }
+      } catch (e) {}
+    });
   };
 
   const closeSocket = () => {
