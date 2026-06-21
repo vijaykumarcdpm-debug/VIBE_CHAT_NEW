@@ -31,6 +31,16 @@ export default function VipPlansPage({
   const plansContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Verify expected plan prices are present; log a console warning if any are missing.
+    const expectedPrices = [39, 59, 99, 139, 199];
+    const available = new Set(plans.map(p => p.price));
+    const missing = expectedPrices.filter(p => !available.has(p));
+    if (missing.length > 0) {
+      console.warn('[VipPlansPage] Missing expected VIP plan prices:', missing);
+    }
+  }, [plans]);
+
+  useEffect(() => {
     if (selectedPlan) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -330,8 +340,8 @@ export default function VipPlansPage({
 
       {selectedPlan && (
         <div className={`modal-overlay z-[100] backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
-          <div className={`mx-auto w-full max-w-4xl max-h-[calc(100dvh-4rem)] modal-card rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
-            <div className="modal-card-body h-full min-h-0 overflow-y-auto p-6 sm:p-8">
+          <div className={`mx-auto w-full max-w-4xl modal-card rounded-3xl shadow-2xl relative flex flex-col max-h-[calc(100dvh-4rem)] overflow-hidden ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
+            <div className="modal-card-body flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
               {/* Modal Header */}
               <div className="flex justify-between items-center mb-6">
                 <h2 className={`text-2xl font-black font-display tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
@@ -440,7 +450,7 @@ export default function VipPlansPage({
                 </div>
               </div>
             </div>
-            <div className="modal-card-footer px-6 sm:px-8 pb-6">
+            <div className="modal-card-footer px-6 sm:px-8 pb-6 flex-shrink-0">
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !screenshot}

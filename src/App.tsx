@@ -1868,7 +1868,7 @@ export default function App() {
                     {!isUserVIP && (
                       <button
                         type="button"
-                        onClick={triggerVipPage}
+                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
                         className="absolute inset-0 rounded-xl bg-transparent"
                         aria-label="Upgrade to VIP to edit city"
                       />
@@ -1895,7 +1895,7 @@ export default function App() {
                     {!isUserVIP && (
                       <button
                         type="button"
-                        onClick={triggerVipPage}
+                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
                         className="absolute inset-0 rounded-xl bg-transparent"
                         aria-label="Upgrade to VIP to edit state"
                       />
@@ -1922,7 +1922,7 @@ export default function App() {
                     {!isUserVIP && (
                       <button
                         type="button"
-                        onClick={triggerVipPage}
+                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
                         className="absolute inset-0 rounded-xl bg-transparent"
                         aria-label="Upgrade to VIP to edit country"
                       />
