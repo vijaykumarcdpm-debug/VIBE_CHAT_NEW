@@ -618,30 +618,15 @@ export default function ChatInterface({
     });
   };
 
-  useEffect(() => {
-    if (!me) return;
-    setOnlineUsers(prev => {
-      if (prev.some((u) => u.id === me.id)) return prev;
-      return [{
-        id: me.id,
-        username: me.username,
-        gender: me.gender,
-        type: me.type,
-        profilePic: me.profilePic,
-        city: me.city,
-        state: me.state,
-        country: me.country,
-        bio: me.bio || '',
-        online: true
-      }, ...prev];
-    });
-  }, [me]);
-
   const partnerOnline = Boolean(
     activePartner?.online === true ||
     (activePartner?.id ? isUserOnline(activePartner.id) : false)
   );
-  const partnerInSameConversation = chatIsActive && !!activePartner;
+  // Consider users in the "same conversation" only when local chat is active
+  // AND the remote partner is actively focusing this conversation. The
+  // server emits `chat:presence` with `focusing` which updates
+  // `partnerFocused` — use that to represent live conversation activity.
+  const partnerInSameConversation = chatIsActive && !!activePartner && partnerFocused;
   const partnerStatusDotClass = partnerInSameConversation
     ? 'bg-amber-400'
     : partnerOnline
@@ -761,6 +746,16 @@ export default function ChatInterface({
     return () => window.removeEventListener('app_hardware_back', handleHardwareBack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatState, sidebarTab, activePartner, activeMenuMessage, showReportDialog, showThemeModal, inspectedPeer, fullScreenImage, showGalleryMenu, showEmojiPicker, showNoMatchPopup, showNoOnlineUsersPopup, showMatchErrorPopup]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && fullScreenImage) {
+        closeModalWithHistory(() => setFullScreenImage(null));
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [fullScreenImage]);
 
   const fetchSideData = async (force: boolean = false) => {
     if (!mountedRef.current) return;
@@ -1514,7 +1509,7 @@ export default function ChatInterface({
   const filteredOnline = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (term) {
-      return backendSearchResults.filter(ou => (me.type === 'Admin' || ou.id !== me.id) && !me.blockedUsers?.includes(ou.id));
+      return backendSearchResults.filter(ou => ou.id !== me.id && !me.blockedUsers?.includes(ou.id));
     }
 
     const allKnownUsers = new Map<string, any>();
@@ -1537,25 +1532,9 @@ export default function ChatInterface({
       allKnownUsers.set(ou.id, { ...ou, online: true, bio: ou.bio || ou.description || '' });
     });
 
-    if (me && !allKnownUsers.has(me.id)) {
-      allKnownUsers.set(me.id, {
-        id: me.id,
-        username: me.username,
-        gender: me.gender,
-        type: me.type,
-        profilePic: me.profilePic,
-        city: me.city || '',
-        state: me.state || '',
-        country: me.country || '',
-        bio: me.bio || '',
-        online: true,
-        lastSeenAt: me.lastSeenAt
-      });
-    }
-
     // Offline users only appear in search
     const mergedUsers = Array.from(allKnownUsers.values())
-      .filter(ou => !me.blockedUsers?.includes(ou.id))
+      .filter(ou => ou.id !== me.id && !me.blockedUsers?.includes(ou.id))
       .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
 
     return mergedUsers
@@ -1565,9 +1544,6 @@ export default function ChatInterface({
         return (ou.type === 'Admin' ? 'VibeChat ADMIN' : ou.username).toLowerCase().includes(term) || (ou.city && ou.city.toLowerCase().includes(term));
       })
       .sort((a, b) => {
-        // Me first
-        if (a.id === me.id && b.id !== me.id) return -1;
-        if (b.id === me.id && a.id !== me.id) return 1;
         // Online users first
         if (a.online !== b.online) {
           return a.online ? -1 : 1;
@@ -1833,10 +1809,6 @@ export default function ChatInterface({
                           <div key={ou.id} className="flex items-center justify-between group">
                             <button
                               onClick={() => {
-                                if (ou.id === me.id) {
-                                  openModal(setInspectedPeer, ou);
-                                  return;
-                                }
                                 handleOpenConversation(ou);
                               }}
                               className={`flex-grow text-left p-4 sm:p-5 lg:p-6 rounded-2xl transition flex items-center gap-4 cursor-pointer border ${
@@ -2985,7 +2957,10 @@ export default function ChatInterface({
                 <img 
                   src={inspectedPeer.profilePic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
                   alt={inspectedPeer.username}
-                  className="w-20 h-20 shrink-0 aspect-square rounded-full object-cover border-2 border-violet-500/30"
+                  onClick={() => inspectedPeer?.profilePic && openModal(setFullScreenImage, inspectedPeer.profilePic)}
+                  role="button"
+                  tabIndex={0}
+                  className="w-20 h-20 shrink-0 aspect-square rounded-full object-cover border-2 border-violet-500/30 cursor-pointer"
                 />
                 
                 <div>
@@ -3257,8 +3232,8 @@ export default function ChatInterface({
 
       {/* FULL SCREEN IMAGE VIEWER */}
       {fullScreenImage && (
-        <div className="modal-overlay bg-slate-950/90 backdrop-blur-sm z-[280] animate-fade-in">
-          <div className="relative modal-card mx-auto w-full max-w-3xl max-h-[calc(100dvh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950 min-h-0">
+        <div className="modal-overlay bg-slate-950/90 backdrop-blur-sm z-[280] animate-fade-in" onClick={() => closeModalWithHistory(() => setFullScreenImage(null))}>
+          <div className="relative modal-card mx-auto w-full max-w-3xl max-h-[calc(100dvh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950 min-h-0" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={() => closeModalWithHistory(() => setFullScreenImage(null))}
