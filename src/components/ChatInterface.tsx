@@ -2135,7 +2135,15 @@ export default function ChatInterface({
           {/* REPORT OVERLAY DIALOG */}
           {showReportDialog && (
             <div className="modal-overlay bg-slate-950/80 z-30 animate-fade-in">
-              <div className={`modal-card mx-auto p-6 rounded-2xl w-full max-w-sm border max-h-[90vh] min-h-0 flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
+              <div className={`modal-card mx-auto p-6 rounded-2xl w-full max-w-sm border max-h-[90dvh] min-h-0 flex flex-col ${theme === "light" ? "bg-white border-slate-200" : "bg-slate-900 border-slate-800"}`}>
+            <button
+              type="button"
+              onClick={() => closeModalWithHistory(() => setShowReportDialog(false))}
+              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-600 hover:text-slate-900' : 'text-slate-200 hover:text-white'}`}
+              aria-label="Close report dialog"
+            >
+              ✕
+            </button>
                 <div className="modal-card-body">
                     <h4 className={`font-bold font-display text-base mb-2 shrink-0 ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>File Abuse Complaint</h4>
                     <p className={`text-xs mb-4 leading-relaxed shrink-0 ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>Please state the reason for filing. Platform operators review transcripts and images immediately.</p>
@@ -2742,7 +2750,7 @@ export default function ChatInterface({
       {/* INSPECTED PEER DETAIL MODAL POPUP DISPLAY CARD */}
       {inspectedPeer && (
         <div className="modal-overlay bg-slate-950/85 backdrop-blur-sm z-50 animate-fade-in text-slate-100">
-          <div className={`modal-card mx-auto w-full max-w-sm max-h-[calc(100vh-4rem)] border rounded-3xl p-6 relative shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
+          <div className={`modal-card mx-auto w-full max-w-sm max-h-[calc(100dvh-4rem)] border rounded-3xl p-6 relative shadow-2xl ${theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-slate-800 text-slate-100"}`}>
             <button
               onClick={() => closeModalWithHistory(() => {
                 setInspectedPeer(null);
@@ -2790,7 +2798,7 @@ export default function ChatInterface({
                   </div>
                 </div>
 
-                <div className="space-y-2.5 max-h-[calc(100vh-19rem)] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="space-y-2.5 max-h-[calc(100dvh-19rem)] overflow-y-auto pr-1 custom-scrollbar">
                   {/* Username input */}
                   <div>
                     <label className="block text-[9px] uppercase font-bold text-slate-200 mb-1 tracking-wider">Username</label>
@@ -3019,7 +3027,7 @@ export default function ChatInterface({
       {/* THEME AND WALLPAPER CUSTOMIZATION MODAL */}
       {showThemeModal && (
         <div className="modal-overlay bg-slate-950/80 backdrop-blur-md z-[100] animate-fade-in text-slate-100">
-          <div className={`modal-card mx-auto w-full max-w-xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 min-h-0 ${
+          <div className={`modal-card mx-auto w-full max-w-xl max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-3xl p-6 md:p-8 relative shadow-2xl border transition duration-300 min-h-0 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
@@ -3107,7 +3115,7 @@ export default function ChatInterface({
           onClick={() => setActiveMenuMessage(null)}
         >
           <div 
-            className={`modal-card mx-auto w-full max-w-xs border rounded-3xl p-5 relative overflow-y-auto max-h-[80vh] min-h-0 shadow-2xl ${
+            className={`modal-card mx-auto w-full max-w-xs border rounded-3xl p-5 relative overflow-y-auto max-h-[80dvh] min-h-0 shadow-2xl ${
               theme === "light" 
                 ? "bg-white border-slate-200 text-slate-900 shadow-slate-300" 
                 : "bg-slate-900 border-slate-800 text-white shadow-black/80"
@@ -3191,7 +3199,7 @@ export default function ChatInterface({
       {/* FULL SCREEN IMAGE VIEWER */}
       {fullScreenImage && (
         <div className="modal-overlay bg-slate-950/90 backdrop-blur-sm z-[280] animate-fade-in">
-          <div className="relative modal-card mx-auto w-full max-w-3xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950 min-h-0">
+          <div className="relative modal-card mx-auto w-full max-w-3xl max-h-[calc(100dvh-4rem)] overflow-hidden rounded-3xl shadow-2xl border border-slate-800 bg-slate-950 min-h-0">
             <button
               type="button"
               onClick={() => closeModalWithHistory(() => setFullScreenImage(null))}

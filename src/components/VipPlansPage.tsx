@@ -330,7 +330,7 @@ export default function VipPlansPage({
 
       {selectedPlan && (
         <div className={`modal-overlay z-[100] backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
-          <div className={`mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] modal-card rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
+          <div className={`mx-auto w-full max-w-4xl max-h-[calc(100dvh-4rem)] modal-card rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
             <div className="modal-card-body h-full min-h-0 overflow-y-auto p-6 sm:p-8">
               {/* Modal Header */}
               <div className="flex justify-between items-center mb-6">
@@ -339,7 +339,8 @@ export default function VipPlansPage({
                 </h2>
                 <button
                   onClick={closeSelectedPlan}
-                  className={`p-2 rounded-full transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500" : "hover:bg-slate-800 text-slate-400"}`}
+                  className={`absolute top-4 right-4 p-2 rounded-full transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500" : "hover:bg-slate-800 text-slate-400"}`}
+                  aria-label="Close payment modal"
                 >
                   <X className="w-6 h-6" />
                 </button>

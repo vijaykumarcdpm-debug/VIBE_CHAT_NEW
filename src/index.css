@@ -189,10 +189,18 @@
     height: auto !important;
   }
 
-  .modal-overlay button[class*="top-"],
-  .modal-overlay button[class*="right-"] {
-    position: relative !important;
-    z-index: 60 !important;
+  .modal-card .modal-close-button {
+    position: absolute !important;
+    z-index: 70 !important;
+    top: 1rem !important;
+    right: 1rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .modal-card .modal-close-button:hover {
+    opacity: 0.95 !important;
   }
 }
 

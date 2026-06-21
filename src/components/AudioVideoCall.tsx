@@ -404,7 +404,7 @@ export default function AudioVideoCall({
   return (
     <div
       ref={containerRef}
-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
+      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100dvh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
         isFullscreen ? 'h-screen rounded-none border-none' : ''
       }`}
     >

@@ -1545,7 +1545,7 @@ export default function App() {
 
       {activeCall && (
         <div className="modal-overlay bg-[#070B16] z-50">
-          <div className="modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100vh-4rem)] overflow-hidden min-h-0">
+          <div className="modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -1567,7 +1567,15 @@ export default function App() {
 
       {incomingCall && (
         <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
-          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100dvh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+            <button
+              type="button"
+              onClick={handleRejectCall}
+              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
+              aria-label="Close incoming call"
+            >
+              ✕
+            </button>
             <div className="modal-card-body">
               <div className="relative mx-auto w-16 h-16">
                 <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
@@ -1615,7 +1623,15 @@ export default function App() {
 
       {outgoingCall && (
         <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
-          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100dvh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+            <button
+              type="button"
+              onClick={() => setOutgoingCall(null)}
+              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
+              aria-label="Cancel outgoing call"
+            >
+              ✕
+            </button>
             <div className="modal-card-body">
               <div className="relative mx-auto w-16 h-16">
                 <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
@@ -1650,7 +1666,7 @@ export default function App() {
 
       {!rulesAgreed && me && (
         <div className="modal-overlay bg-slate-950/90 backdrop-blur-md z-[110] animate-fade-in">
-          <div className={`modal-card mx-auto w-full max-w-md max-h-[95vh] scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
+          <div className={`modal-card mx-auto w-full max-w-md max-h-[95dvh] scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/10 blur-xl rounded-full pointer-events-none"></div>
             
             <div className="text-4xl">📜</div>
@@ -1691,7 +1707,7 @@ export default function App() {
 
       {adminChangesNotice && (
         <div className="modal-overlay bg-slate-950/85 backdrop-blur-md z-[160] animate-fade-in text-slate-100">
-          <div className={`modal-card mx-auto w-full max-w-sm max-h-[90vh] border rounded-3xl p-6 relative shadow-2xl ${
+          <div className={`modal-card mx-auto w-full max-w-sm max-h-[90dvh] border rounded-3xl p-6 relative shadow-2xl ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-xl' : 'bg-slate-905 border-slate-800 text-slate-100 shadow-black/90'
           }`}>
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-500"></div>
@@ -1737,7 +1753,7 @@ export default function App() {
 
       {showOwnProfileModal && me && (
         <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-[110] animate-fade-in text-slate-100">
-          <div className={`modal-card mx-auto w-full max-w-lg max-h-[95vh] scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
+          <div className={`modal-card mx-auto w-full max-w-lg max-h-[95dvh] scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
@@ -1838,16 +1854,26 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>City</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <input
-                    type="text"
-                    value={editCity}
-                    onChange={(e) => setEditCity(e.target.value)}
-                    disabled={!isUserVIP}
-                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
-                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
-                    }`}
-                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      disabled={!isUserVIP}
+                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+                      }`}
+                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+                    />
+                    {!isUserVIP && (
+                      <button
+                        type="button"
+                        onClick={triggerVipPage}
+                        className="absolute inset-0 rounded-xl bg-transparent"
+                        aria-label="Upgrade to VIP to edit city"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -1855,16 +1881,26 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>State</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <input
-                    type="text"
-                    value={editState}
-                    onChange={(e) => setEditState(e.target.value)}
-                    disabled={!isUserVIP}
-                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
-                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
-                    }`}
-                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={editState}
+                      onChange={(e) => setEditState(e.target.value)}
+                      disabled={!isUserVIP}
+                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+                      }`}
+                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+                    />
+                    {!isUserVIP && (
+                      <button
+                        type="button"
+                        onClick={triggerVipPage}
+                        className="absolute inset-0 rounded-xl bg-transparent"
+                        aria-label="Upgrade to VIP to edit state"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1872,16 +1908,26 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Country</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <input
-                    type="text"
-                    value={editCountry}
-                    onChange={(e) => setEditCountry(e.target.value)}
-                    disabled={!isUserVIP}
-                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
-                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
-                    }`}
-                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={editCountry}
+                      onChange={(e) => setEditCountry(e.target.value)}
+                      disabled={!isUserVIP}
+                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+                      }`}
+                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+                    />
+                    {!isUserVIP && (
+                      <button
+                        type="button"
+                        onClick={triggerVipPage}
+                        className="absolute inset-0 rounded-xl bg-transparent"
+                        aria-label="Upgrade to VIP to edit country"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2070,7 +2116,7 @@ export default function App() {
                   </button>
 
                   {showNotificationsDropdown && (
-                    <div className={`fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-3 sm:w-80 max-h-[80vh] sm:max-h-[400px] overflow-y-auto rounded-2xl shadow-2xl border z-[100] animate-fade-in origin-top-right ${
+                    <div className={`fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-3 sm:w-80 max-h-[80dvh] sm:max-h-[400px] overflow-y-auto rounded-2xl shadow-2xl border z-[100] animate-fade-in origin-top-right ${
                       theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
                     }`}>
                       <div className={`p-4 border-b font-bold tracking-tight ${theme === 'light' ? 'border-slate-100 text-slate-800' : 'border-slate-800 text-white'}`}>
@@ -2321,7 +2367,15 @@ export default function App() {
 
       {showExitConfirm && (
         <div className={`modal-overlay text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
-          <div className={`modal-card mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90vh] space-y-6 shadow-2xl relative min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+          <div className={`modal-card mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90dvh] space-y-6 shadow-2xl relative min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+            <button
+              type="button"
+              onClick={() => setShowExitConfirm(false)}
+              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
+              aria-label="Close exit confirmation"
+            >
+              ✕
+            </button>
             <div className="modal-card-body">
               <div className="text-4xl mb-2">🚪</div>
               <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
