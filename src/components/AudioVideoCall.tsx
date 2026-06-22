@@ -439,7 +439,7 @@ export default function AudioVideoCall({
   return (
     <div
       ref={containerRef}
-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition pb-20 sm:pb-0 ${
+      className={`relative flex flex-col items-center justify-center w-full h-full min-h-0 md:min-h-[500px] max-h-full bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition sm:pb-0 ${
         isFullscreen ? 'h-screen rounded-none border-none' : ''
       }`}
     >
@@ -579,7 +579,10 @@ export default function AudioVideoCall({
       )}
 
       {/* INTERACTIVE CONTROLS BAR */}
-      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl z-20 max-w-[calc(100vw-1.5rem)] sm:max-w-none w-fit">
+      <div
+        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-start sm:justify-center gap-1.5 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl z-20 w-full max-w-[calc(100vw-1.25rem)] overflow-x-auto call-controls-bar"
+        style={{ bottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
+      >
         {/* Toggle Audio Mute */}
         <button
           onClick={toggleMute}

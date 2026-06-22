@@ -1610,7 +1610,7 @@ export default function App() {
 
       {activeCall && (
         <div className="modal-overlay bg-[#070B16] z-50">
-          <div className="modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
+          <div className="modal-card full-screen-call-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -2358,7 +2358,7 @@ export default function App() {
             </div>
           </main>
 
-          {(screen === 'lobby' || screen === 'plans') && (
+          {screen === 'lobby' && !isChatActiveMobile && (
             <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
               theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
             }`}>
