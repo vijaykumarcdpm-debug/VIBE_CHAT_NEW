@@ -2343,74 +2343,6 @@ export default function App() {
                         />
                       )}
 
-                      {(screen === 'lobby' || screen === 'plans') && (
-                        <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
-                          theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
-                        }`}>
-                          <button
-                            onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                              screen === 'lobby' && sidebarTab === 'people'
-                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                            }`}
-                          >
-                            <div className="relative shrink-0">
-                              <Users className="w-5 h-5" />
-                              {globalStats && (
-                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
-                                  {globalStats.totalOnline}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
-                          </button>
-
-                          <button
-                            onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                              screen === 'lobby' && sidebarTab === 'chat'
-                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                            }`}
-                          >
-                            <div className="relative shrink-0">
-                              <MessageSquare className="w-5 h-5" />
-                              {unreadChatCount > 0 && (
-                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
-                                  {unreadChatCount}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
-                          </button>
-
-                          <button
-                            onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
-                              screen === 'lobby' && sidebarTab === 'lounge'
-                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                            }`}
-                          >
-                            <Smile className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
-                          </button>
-
-                          <button
-                            onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                              screen === 'plans'
-                                ? 'bg-amber-500/10 text-amber-500 shadow-inner'
-                                : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
-                            }`}
-                          >
-                            <Sparkles className="w-5 h-5 shrink-0" />
-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
-                          </button>
-                        </nav>
-                      )}
-        
                       {screen === 'admin' && isUserAdmin && (
                         <AdminPanel
                           onBack={() => { setScreen('lobby'); setSidebarTab('people'); }}
@@ -2425,6 +2357,70 @@ export default function App() {
               </div>
             </div>
           </main>
+
+          {(screen === 'lobby' || screen === 'plans') && (
+            <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
+              theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
+            }`}>
+              <button
+                onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                  screen === 'lobby' && sidebarTab === 'people'
+                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}>
+                <div className="relative shrink-0">
+                  <Users className="w-5 h-5" />
+                  {globalStats && (
+                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
+                      {globalStats.totalOnline}
+                    </span>
+                  )}
+                </div>
+                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
+              </button>
+
+              <button
+                onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                  screen === 'lobby' && sidebarTab === 'chat'
+                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}>
+                <div className="relative shrink-0">
+                  <MessageSquare className="w-5 h-5" />
+                  {unreadChatCount > 0 && (
+                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
+                      {unreadChatCount}
+                    </span>
+                  )}
+                </div>
+                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
+              </button>
+
+              <button
+                onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
+                  screen === 'lobby' && sidebarTab === 'lounge'
+                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}>
+                <Smile className="w-5 h-5 shrink-0" />
+                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
+              </button>
+
+              <button
+                onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                  screen === 'plans'
+                    ? 'bg-amber-500/10 text-amber-500 shadow-inner'
+                    : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
+                }`}>
+                <Sparkles className="w-5 h-5 shrink-0" />
+                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
+              </button>
+            </nav>
+          )}
 
           {/* Footer - Only show before login on public pages */}
         </div>

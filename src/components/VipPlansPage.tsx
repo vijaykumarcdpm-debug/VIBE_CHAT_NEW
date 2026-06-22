@@ -341,7 +341,7 @@ export default function VipPlansPage({
       {selectedPlan && (
         <div className={`modal-overlay z-[100] backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
           <div className={`mx-auto w-full max-w-4xl modal-card rounded-3xl shadow-2xl relative flex flex-col max-h-[calc(100dvh-4rem)] overflow-hidden ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
-            <div className="modal-card-body flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
+            <div className="modal-card-body flex-1 min-h-0 overflow-y-auto p-6 sm:p-8" style={{ maxHeight: 'calc(100dvh - 14rem)' }}>
               {/* Modal Header */}
               <div className="flex justify-between items-center mb-6">
                 <h2 className={`text-2xl font-black font-display tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
@@ -450,17 +450,19 @@ export default function VipPlansPage({
                 </div>
               </div>
             </div>
-            <div className="modal-card-footer px-6 sm:px-8 pb-6 flex-shrink-0">
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !screenshot}
-                className="w-full py-4 bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:dark:from-slate-800 disabled:dark:to-slate-800 disabled:dark:text-slate-600 hover:from-violet-500 hover:to-fuchsia-400 text-white rounded-2xl font-black font-display tracking-widest uppercase shadow-xl shadow-violet-500/20 disabled:shadow-none transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? 'Verifying Upload...' : `Submit Payment of ₹${selectedPlan.price}`}
-              </button>
-              <p className={`text-xs font-bold text-center mt-4 flex items-center justify-center gap-1.5 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
-                <Shield className="w-4 h-4" /> Secure 256-bit UPI Gateway Protection
-              </p>
+            <div className="modal-card-footer px-6 sm:px-8 pb-6 flex-shrink-0 bg-transparent">
+              <div className="sticky bottom-0 left-0 right-0 pt-4 bg-transparent">
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !screenshot}
+                  className="w-full py-4 bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:dark:from-slate-800 disabled:dark:to-slate-800 disabled:dark:text-slate-600 hover:from-violet-500 hover:to-fuchsia-400 text-white rounded-2xl font-black font-display tracking-widest uppercase shadow-xl shadow-violet-500/20 disabled:shadow-none transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? 'Verifying Upload...' : `Submit Payment of ₹${selectedPlan.price}`}
+                </button>
+                <p className={`text-xs font-bold text-center mt-4 flex items-center justify-center gap-1.5 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
+                  <Shield className="w-4 h-4" /> Secure 256-bit UPI Gateway Protection
+                </p>
+              </div>
             </div>
           </div>
         </div>
