@@ -874,7 +874,7 @@ export default function App() {
     const isModerator = localStorage.getItem('vibechat_rejoin_isModerator') === 'true';
     const photoVerified = localStorage.getItem('vibechat_rejoin_photoVerified') === 'true';
 
-    const snapshot = {
+    return {
       id: localStorage.getItem('vibechat_rejoin_id') || '',
       username,
       type,
@@ -892,65 +892,46 @@ export default function App() {
       photoVerified: photoVerified || undefined,
       blockedUsers: []
     };
-
-    try { console.log('[REJOIN TRACE] STEP 2: loadRejoinSnapshot =>', snapshot); } catch (e) {}
-    return snapshot;
   };
 
   const attemptGuestRejoinFromStoredDevice = async (): Promise<boolean> => {
     const snapshot = loadRejoinSnapshot();
     const deviceId = typeof window !== 'undefined' ? localStorage.getItem('vibechat_device_id') : null;
 
-    try { console.log('[REJOIN TRACE] STEP 5: Entering attemptGuestRejoinFromStoredDevice. snapshot=', snapshot); } catch (e) {}
-    try { console.log('[REJOIN TRACE] STEP 3: vibechat_device_id present=', !!deviceId); } catch (e) {}
-
-    // snapshot.id is not required for server-side guest rejoin (server matches by username+deviceId)
-    if (!snapshot || snapshot.type !== 'Guest' || !snapshot.username || !deviceId) {
-      try { console.log('[REJOIN TRACE] attemptGuestRejoinFromStoredDevice -> missing snapshot or deviceId, aborting rejoin'); } catch (e) {}
+    if (!snapshot || snapshot.type !== 'Guest' || !snapshot.username || !snapshot.id || !deviceId) {
       return false;
     }
 
     try {
-      const reqBody = {
-        username: snapshot.username,
-        gender: snapshot.gender,
-        age: snapshot.age,
-        city: snapshot.city,
-        state: snapshot.state,
-        country: snapshot.country,
-        profilePic: snapshot.profilePic,
-        deviceId
-      };
-      try { console.log('[REJOIN TRACE] STEP 5: /api/auth/guest request body =', reqBody); } catch (e) {}
-
       const res = await fetch('/api/auth/guest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqBody)
+        body: JSON.stringify({
+          username: snapshot.username,
+          gender: snapshot.gender,
+          age: snapshot.age,
+          city: snapshot.city,
+          state: snapshot.state,
+          country: snapshot.country,
+          profilePic: snapshot.profilePic,
+          deviceId
+        })
       });
 
-      try { console.log('[REJOIN TRACE] STEP 6: /api/auth/guest HTTP status =', res.status); } catch (e) {}
-
       if (!res.ok) {
-        try { console.log('[REJOIN TRACE] /api/auth/guest returned not ok; status=', res.status); } catch (e) {}
         return false;
       }
 
       const body = await res.json();
-      try { console.log('[REJOIN TRACE] /api/auth/guest response body =', body); } catch (e) {}
       const updatedProfile = body.user;
       const token = body.token;
       if (!token || !updatedProfile) {
-        try { console.log('[REJOIN TRACE] /api/auth/guest missing token or user in response'); } catch (e) {}
         return false;
       }
 
-      try { console.log('[REJOIN TRACE] STEP 8: about to setToken (guest rejoin) with token=', token); } catch (e) {}
       localStorage.setItem('vibechat_token', token);
       tokenRef.current = token;
       setToken(token);
-
-      try { console.log('[REJOIN TRACE] STEP 7: saveRejoinSnapshot executing now'); } catch (e) {}
       saveRejoinSnapshot(updatedProfile, token);
       setMe(updatedProfile);
       setDetectedGeo({
@@ -968,7 +949,6 @@ export default function App() {
   };
 
   const saveRejoinSnapshot = (profile: Partial<UserProfile>, token: string) => {
-    try { console.log('[REJOIN TRACE] saveRejoinSnapshot called with profile=', profile, ' token=', token ? '***present***' : 'null'); } catch (e) {}
     if (!token) return;
     if (profile.id) {
       localStorage.setItem('vibechat_rejoin_id', profile.id);
@@ -1013,7 +993,6 @@ export default function App() {
     } else if (!localStorage.getItem('vibechat_rejoin_createdAt')) {
       localStorage.setItem('vibechat_rejoin_createdAt', new Date().toISOString());
     }
-    try { console.log('[REJOIN TRACE] saveRejoinSnapshot finished writing rejoin keys'); } catch (e) {}
   };
 
   useEffect(() => {
@@ -1035,7 +1014,6 @@ export default function App() {
   const fetchLatestProfile = async () => {
     // Read token from localStorage to avoid race condition with tokenRef sync
     const currentToken = getActiveAuthToken();
-    try { console.log('[REJOIN TRACE] STEP 9: fetchLatestProfile begin. currentToken present=', !!currentToken); } catch (e) {}
     if (!currentToken || currentToken.trim().length === 0) {
       clearAuthRetryTimer();
       return;
@@ -1045,7 +1023,6 @@ export default function App() {
       const res = await fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${currentToken}` }
       });
-      try { console.log('[REJOIN TRACE] STEP 10: /api/auth/me HTTP status =', res.status); } catch (e) {}
 
       if (res.ok) {
         const profile = await res.json();
@@ -1097,14 +1074,10 @@ export default function App() {
           if (currentRejoinToken && currentRejoinToken === currentToken) {
             const restored = await attemptGuestRejoinFromStoredDevice();
             if (restored) {
-              try { console.log('[REJOIN TRACE] attemptGuestRejoinFromStoredDevice succeeded during fetchLatestProfile fallback'); } catch (e) {}
               return;
-            } else {
-              try { console.log('[REJOIN TRACE] attemptGuestRejoinFromStoredDevice FAILED during fetchLatestProfile fallback'); } catch (e) {}
             }
           }
-          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing active auth token and calling handleLogout');
-          try { console.log('[REJOIN TRACE] STEP 12: reason=auth rejected & rejoin failed -> initiating handleLogout cleanup'); } catch (e) {}
+          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing active auth token.');
           localStorage.removeItem('vibechat_token');
           tokenRef.current = null;
           setToken(null);
@@ -1268,7 +1241,7 @@ export default function App() {
                 peerName: prevOrig.targetName,
                 peerPic: prevOrig.targetPic,
                 isCaller: true,
-                type: data.type || prevOrig.type
+                type: prevOrig.type
               });
               showToast('Stranger accepted call. Connecting lines...');
             } else if (!data.accepted) {
@@ -1396,7 +1369,9 @@ export default function App() {
 
       if (res.ok) {
         const body = await res.json();
-        const profile = body.user || {
+        localStorage.setItem('vibechat_token', body.token);
+        setToken(body.token);
+        saveRejoinSnapshot(body.user || {
           id: body.user?.id || '',
           username: userName,
           type: 'Guest',
@@ -1407,14 +1382,7 @@ export default function App() {
           profilePic: profilePic || '',
           age: age || undefined,
           bio: ''
-        };
-        localStorage.setItem('vibechat_token', body.token);
-        tokenRef.current = body.token;
-        setToken(body.token);
-        setMe(profile);
-        setScreen('lobby');
-        setSidebarTab('people');
-        saveRejoinSnapshot(profile, body.token);
+        }, body.token);
         fetchStats();
         showToast(`Welcome Guest, ${userName}!`);
       } else {
@@ -1465,11 +1433,8 @@ export default function App() {
     if (res.ok) {
       const body = await res.json();
       localStorage.setItem('vibechat_token', body.token);
-      tokenRef.current = body.token;
       setToken(body.token);
-      setMe(body.user);
-      setScreen('lobby');
-      setSidebarTab('people');
+      tokenRef.current = body.token;
       saveRejoinSnapshot(body.user, body.token);
       fetchStats();
       showToast(`Welcome Back, ${body.user.type === 'Admin' ? 'VibeChat ADMIN' : body.user.username}! Secure connection approved.`);
@@ -1489,11 +1454,8 @@ export default function App() {
     if (res.ok) {
       const body = await res.json();
       localStorage.setItem('vibechat_token', body.token);
-      tokenRef.current = body.token;
       setToken(body.token);
-      setMe(body.user);
-      setScreen('lobby');
-      setSidebarTab('people');
+      tokenRef.current = body.token;
       saveRejoinSnapshot(body.user, body.token);
       fetchStats();
       showToast(`Congratulations ${body.user.type === 'Admin' ? 'VibeChat ADMIN' : body.user.username}, account setup successful!`);
@@ -1625,10 +1587,6 @@ export default function App() {
 
   const isUserAdmin = me?.type === 'Admin';
   const isUserVIP = me?.type === 'Royal VIP' || me?.type === 'Admin' || me?.type === 'Moderator';
-  const isPlansScreen = screen === 'plans';
-  const isPeopleScreen = screen === 'lobby' && sidebarTab === 'people';
-  const isChatScreen = screen === 'lobby' && sidebarTab === 'chat';
-  const isLoungeScreen = screen === 'lobby' && sidebarTab === 'lounge';
 
   return (
     <div id="app-root-container" className={`h-[100dvh] w-full max-w-[100vw] overflow-hidden font-sans antialiased flex flex-col justify-between theme-transition ${
@@ -1652,7 +1610,7 @@ export default function App() {
 
       {activeCall && (
         <div className="modal-overlay bg-[#070B16] z-50">
-          <div className="modal-card full-screen-call-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
+          <div className="modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -1673,34 +1631,44 @@ export default function App() {
       )}
 
       {incomingCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
-          <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
-            <div className="relative mx-auto w-16 h-16">
-              <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
-              <img
-                src={incomingCall.callerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
-                alt={incomingCall.callerName}
-                className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
-                referrerPolicy="no-referrer"
-              />
+        <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
+          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100dvh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+            <button
+              type="button"
+              onClick={handleRejectCall}
+              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
+              aria-label="Close incoming call"
+            >
+              ✕
+            </button>
+            <div className="modal-card-body">
+              <div className="relative mx-auto w-16 h-16">
+                <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+                <img
+                  src={incomingCall.callerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+                  alt={incomingCall.callerName}
+                  className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <div>
+                {incomingCall.breakthrough && (
+                  <div className="absolute top-2 left-0 w-full flex justify-center -mt-6">
+                    <span className="bg-amber-500 text-[9px] font-black tracking-widest text-white uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1 mx-auto w-max">
+                      <Sparkles className="w-3 h-3" /> VIP Breakthrough
+                    </span>
+                  </div>
+                )}
+                <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{incomingCall.callerName}</h3>
+                <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
+                  <Volume2 className="w-3.5 h-3.5 animate-bounce" />
+                  Incoming {incomingCall.type} Call
+                </p>
+              </div>
             </div>
 
-            <div>
-              {incomingCall.breakthrough && (
-                <div className="absolute top-2 left-0 w-full flex justify-center -mt-6">
-                  <span className="bg-amber-500 text-[9px] font-black tracking-widest text-white uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1 mx-auto w-max">
-                    <Sparkles className="w-3 h-3" /> VIP Breakthrough
-                  </span>
-                </div>
-              )}
-              <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{incomingCall.callerName}</h3>
-              <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
-                <Volume2 className="w-3.5 h-3.5 animate-bounce" />
-                Incoming {incomingCall.type} Call
-              </p>
-            </div>
-
-            <div className="flex gap-2">
+            <div className="modal-card-footer flex gap-2">
               <button
                 onClick={handleAcceptCall}
                 className="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition cursor-pointer"
@@ -1719,27 +1687,37 @@ export default function App() {
       )}
 
       {outgoingCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
-          <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
-            <div className="relative mx-auto w-16 h-16">
-              <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
-              <img
-                src={outgoingCall.targetPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
-                alt={outgoingCall.targetName}
-                className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
-                referrerPolicy="no-referrer"
-              />
+        <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
+          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100dvh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+            <button
+              type="button"
+              onClick={() => setOutgoingCall(null)}
+              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
+              aria-label="Cancel outgoing call"
+            >
+              ✕
+            </button>
+            <div className="modal-card-body">
+              <div className="relative mx-auto w-16 h-16">
+                <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+                <img
+                  src={outgoingCall.targetPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+                  alt={outgoingCall.targetName}
+                  className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <div>
+                <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{outgoingCall.targetName}</h3>
+                <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
+                  <Phone className="w-3.5 h-3.5 animate-pulse" />
+                  Calling...
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{outgoingCall.targetName}</h3>
-              <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
-                <Phone className="w-3.5 h-3.5 animate-pulse" />
-                Calling...
-              </p>
-            </div>
-
-            <div>
+            <div className="modal-card-footer">
               <button
                 onClick={() => setOutgoingCall(null)}
                 className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-lg"
@@ -2307,7 +2285,7 @@ export default function App() {
           <main className="flex-1 min-h-0 py-0 sm:py-6 relative z-10 flex flex-col justify-center items-center overflow-hidden w-full max-w-full">
             <div className="absolute top-0 right-0 w-[500px] h-[400px] bg-gradient-to-tr from-violet-600/5 via-indigo-600/3 to-transparent blur-[120px] pointer-events-none rounded-full"></div>
             
-            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden pb-20 sm:pb-0">
+            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden">
               
               <div className={`w-full max-w-full flex flex-col flex-1 min-h-0 sm:rounded-[2rem] overflow-hidden shadow-2xl transition duration-300 sm:border ${
                   theme === 'light'
@@ -2365,6 +2343,74 @@ export default function App() {
                         />
                       )}
 
+                      {(screen === 'lobby' || screen === 'plans') && (
+                        <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden ${isChatActiveMobile ? 'hidden md:flex' : ''} ${
+                          theme === 'light' ? 'bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/50 backdrop-blur-md border-violet-900/30'
+                        }`}>
+                          <button
+                            onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                              screen === 'lobby' && sidebarTab === 'people'
+                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <div className="relative shrink-0">
+                              <Users className="w-5 h-5" />
+                              {globalStats && (
+                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
+                                  {globalStats.totalOnline}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                              screen === 'lobby' && sidebarTab === 'chat'
+                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <div className="relative shrink-0">
+                              <MessageSquare className="w-5 h-5" />
+                              {unreadChatCount > 0 && (
+                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
+                                  {unreadChatCount}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
+                              screen === 'lobby' && sidebarTab === 'lounge'
+                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <Smile className="w-5 h-5 shrink-0" />
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                              screen === 'plans'
+                                ? 'bg-amber-500/10 text-amber-500 shadow-inner'
+                                : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
+                            }`}
+                          >
+                            <Sparkles className="w-5 h-5 shrink-0" />
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
+                          </button>
+                        </nav>
+                      )}
+        
                       {screen === 'admin' && isUserAdmin && (
                         <AdminPanel
                           onBack={() => { setScreen('lobby'); setSidebarTab('people'); }}
@@ -2379,70 +2425,6 @@ export default function App() {
               </div>
             </div>
           </main>
-
-          {screen === 'lobby' && !isChatActiveMobile && (
-            <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
-              theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
-            }`}>
-              <button
-                onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                  screen === 'lobby' && sidebarTab === 'people'
-                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}>
-                <div className="relative shrink-0">
-                  <Users className="w-5 h-5" />
-                  {globalStats && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
-                      {globalStats.totalOnline}
-                    </span>
-                  )}
-                </div>
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
-              </button>
-
-              <button
-                onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                  screen === 'lobby' && sidebarTab === 'chat'
-                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}>
-                <div className="relative shrink-0">
-                  <MessageSquare className="w-5 h-5" />
-                  {unreadChatCount > 0 && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
-                      {unreadChatCount}
-                    </span>
-                  )}
-                </div>
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
-              </button>
-
-              <button
-                onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
-                  screen === 'lobby' && sidebarTab === 'lounge'
-                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}>
-                <Smile className="w-5 h-5 shrink-0" />
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
-              </button>
-
-              <button
-                onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                  isPlansScreen
-                    ? 'bg-amber-500/10 text-amber-500 shadow-inner'
-                    : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
-                }`}>
-                <Sparkles className="w-5 h-5 shrink-0" />
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
-              </button>
-            </nav>
-          )}
 
           {/* Footer - Only show before login on public pages */}
         </div>

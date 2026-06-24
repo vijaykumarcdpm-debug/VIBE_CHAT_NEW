@@ -44,10 +44,100 @@
     box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
   }
 
-  /* Placeholder to maintain structure - modal classes inherit Tailwind inline styles */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(env(safe-area-inset-top), 1rem) max(env(safe-area-inset-right), 1rem) max(env(safe-area-inset-bottom), 1rem) max(env(safe-area-inset-left), 1rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    z-index: 50;
+    text-align: center;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: min(100vw - 2rem, 68rem);
+    max-height: calc(100dvh - 2rem);
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: auto;
+    position: relative;
+    box-sizing: border-box;
+  }
+
+  .modal-card.overflow-y-auto,
+  .modal-card.overflow-auto,
+  .modal-card.overflow-y-scroll,
+  .modal-card.overflow-x-hidden {
+    overflow: auto !important;
+  }
+
+  .modal-card-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+
+  .modal-card-footer {
+    flex-shrink: 0;
+  }
+
+  .modal-card > *:last-child {
+    margin-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+
+  .modal-card img,
+  .modal-card video,
+  .modal-card iframe,
+  .modal-card svg {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
-/* Modal classes inherit styles from components */
+/* Hide overlay scrollbar (keep scrolling) and style modal body scrollbar thinly */
+.modal-overlay {
+  -ms-overflow-style: none; /* IE 10+ */
+  scrollbar-width: none; /* Firefox */
+}
+.modal-overlay::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.modal-card-body {
+  /* ensure thin styled scrollbar within modal body */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100,100,100,0.4) transparent;
+}
+.modal-card-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.modal-card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-card-body::-webkit-scrollbar-thumb {
+  background: rgba(100,100,100,0.35);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.modal-card-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(100,100,100,0.55);
+}
+
 .plan-duration-card, .plan-duration-card * {
   color: #000000 !important;
   font-weight: 900 !important;
@@ -62,59 +152,55 @@
    Uses attribute selectors to match Tailwind classes reliably across all modals.
 */
 @media (max-width: 768px) {
-  /* Step 1: Fix overlay container - center popup and allow scrolling when needed */
-  [class*="fixed"][class*="inset-0"] {
+  .modal-overlay {
     align-items: center !important;
     justify-content: center !important;
-    padding-top: 1rem !important;
-    padding-bottom: 1rem !important;
+    padding: max(env(safe-area-inset-top), 1rem) max(env(safe-area-inset-right), 1rem) max(env(safe-area-inset-bottom), 1rem) max(env(safe-area-inset-left), 1rem) !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     min-height: 100dvh !important;
     max-height: 100dvh !important;
+    text-align: center !important;
   }
 
-  /* Step 2: Modal card (direct child) - constrain height and ENABLE scrolling */
-  [class*="fixed"][class*="inset-0"] > * {
+  .modal-overlay > .modal-card {
+    max-width: min(100vw - 2rem, 720px) !important;
+    width: min(100%, calc(100vw - 2rem)) !important;
     max-height: calc(100dvh - 2rem) !important;
     height: auto !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+    margin: auto !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
   }
 
-  /* Step 3: Override overflow-hidden on modal containers (critical fix) */
-  [class*="fixed"][class*="inset-0"][class*="overflow-hidden"] {
+  .modal-overlay .modal-card-body {
     overflow-y: auto !important;
     overflow-x: hidden !important;
-  }
-
-  /* Step 4: Override overflow-hidden on nested content that should scroll */
-  [class*="fixed"][class*="inset-0"] *[class*="overflow-hidden"] {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-  }
-
-  /* Step 5: Deeply nested scrollable areas (for complex modals) */
-  [class*="fixed"] [class*="max-h-"] {
-    max-height: 100% !important;
-    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
+    max-height: calc(100dvh - 12rem) !important;
   }
 
-  /* Step 6: Keep close buttons and headers visible */
-  [class*="fixed"] button[class*="top-"],
-  [class*="fixed"] button[class*="right-"] {
-    position: relative !important;
-    z-index: 60 !important;
+  .modal-overlay .modal-card img,
+  .modal-overlay .modal-card video,
+  .modal-overlay .modal-card iframe,
+  .modal-overlay .modal-card svg {
+    max-width: 100% !important;
+    height: auto !important;
   }
 
-  /* Step 7: Allow flex containers inside modals to stack on mobile */
-  [class*="fixed"][class*="inset-0"] [class*="grid"],
-  [class*="fixed"][class*="inset-0"] [class*="flex"] {
-    max-height: 100% !important;
+  .modal-card .modal-close-button {
+    position: absolute !important;
+    z-index: 70 !important;
+    top: 1rem !important;
+    right: 1rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .modal-card .modal-close-button:hover {
+    opacity: 0.95 !important;
   }
 }
-
 

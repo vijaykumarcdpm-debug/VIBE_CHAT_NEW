@@ -31,6 +31,16 @@ export default function VipPlansPage({
   const plansContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Verify expected plan prices are present; log a console warning if any are missing.
+    const expectedPrices = [39, 59, 99, 139, 199];
+    const available = new Set(plans.map(p => p.price));
+    const missing = expectedPrices.filter(p => !available.has(p));
+    if (missing.length > 0) {
+      console.warn('[VipPlansPage] Missing expected VIP plan prices:', missing);
+    }
+  }, [plans]);
+
+  useEffect(() => {
     if (selectedPlan) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -44,10 +54,7 @@ export default function VipPlansPage({
   useEffect(() => {
     function handleAppHardwareBack(evt: any) {
       if (selectedPlan) {
-        setSelectedPlan(null);
-        setScreenshot('');
-        setScreenshotName('');
-        setUploadError('');
+        closeSelectedPlan();
         try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         if (evt && typeof evt === 'object') {
           try { evt.detail = evt.detail || {}; evt.detail.handled = true; } catch (e) {}
@@ -92,6 +99,27 @@ export default function VipPlansPage({
       setUploadError('Failed to read image script. Try another image.');
     };
     reader.readAsDataURL(file);
+  };
+
+  const openSelectedPlan = (plan: VIPPlan) => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState({ vibe_app: true, modalOpen: true }, "");
+      } catch (e) {}
+    }
+    setSelectedPlan(plan);
+  };
+
+  const closeSelectedPlan = () => {
+    if (typeof window !== 'undefined' && window.history.state?.modalOpen) {
+      try {
+        window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+      } catch (e) {}
+    }
+    setSelectedPlan(null);
+    setScreenshot('');
+    setScreenshotName('');
+    setUploadError('');
   };
 
   const handleSubmit = async () => {
@@ -268,7 +296,7 @@ export default function VipPlansPage({
             return (
               <button
                 key={pl.id}
-                onClick={() => { try { window.history.pushState({ vibe_app: true, modalOpen: true }, ""); } catch (e) {} setSelectedPlan(pl); setSubmissionSuccess(false); }}
+                onClick={() => { openSelectedPlan(pl); setSubmissionSuccess(false); }}
                 className={`plan-duration-card plan-duration-card-bg text-left p-4 rounded-2xl border-2 transition relative duration-200 cursor-pointer ${
                   isSelected
                     ? 'border-black scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
@@ -311,17 +339,18 @@ export default function VipPlansPage({
       </div>
 
       {selectedPlan && (
-        <div className={`fixed inset-0 z-[100] overflow-y-auto touch-pan-y p-4 backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
-          <div className={`mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-hidden rounded-3xl shadow-2xl relative ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
-            <div className="h-full min-h-0 overflow-y-auto p-6 sm:p-8">
+        <div className={`modal-overlay z-[100] backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
+          <div className={`mx-auto w-full max-w-4xl modal-card rounded-3xl shadow-2xl relative flex flex-col max-h-[calc(100dvh-4rem)] overflow-hidden ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
+            <div className="modal-card-body flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
               {/* Modal Header */}
               <div className="flex justify-between items-center mb-6">
                 <h2 className={`text-2xl font-black font-display tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
                   Complete VIP Enrollment
                 </h2>
                 <button
-                  onClick={() => { setSelectedPlan(null); setScreenshot(''); setScreenshotName(''); setUploadError(''); }}
-                  className={`p-2 rounded-full transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500" : "hover:bg-slate-800 text-slate-400"}`}
+                  onClick={closeSelectedPlan}
+                  className={`absolute top-4 right-4 p-2 rounded-full transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500" : "hover:bg-slate-800 text-slate-400"}`}
+                  aria-label="Close payment modal"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -418,21 +447,20 @@ export default function VipPlansPage({
                       )}
                     </div>
                   </div>
-
-                  <div className="mt-8">
-                    <button
-                      onClick={handleSubmit}
-                      disabled={isSubmitting || !screenshot}
-                      className="w-full py-4 bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:dark:from-slate-800 disabled:dark:to-slate-800 disabled:dark:text-slate-600 hover:from-violet-500 hover:to-fuchsia-400 text-white rounded-2xl font-black font-display tracking-widest uppercase shadow-xl shadow-violet-500/20 disabled:shadow-none transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? 'Verifying Upload...' : `Submit Payment of ₹${selectedPlan.price}`}
-                    </button>
-                    <p className={`text-xs font-bold text-center mt-4 flex items-center justify-center gap-1.5 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
-                      <Shield className="w-4 h-4" /> Secure 256-bit UPI Gateway Protection
-                    </p>
-                  </div>
                 </div>
               </div>
+            </div>
+            <div className="modal-card-footer px-6 sm:px-8 pb-6 flex-shrink-0">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !screenshot}
+                className="w-full py-4 bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:dark:from-slate-800 disabled:dark:to-slate-800 disabled:dark:text-slate-600 hover:from-violet-500 hover:to-fuchsia-400 text-white rounded-2xl font-black font-display tracking-widest uppercase shadow-xl shadow-violet-500/20 disabled:shadow-none transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Verifying Upload...' : `Submit Payment of ₹${selectedPlan.price}`}
+              </button>
+              <p className={`text-xs font-bold text-center mt-4 flex items-center justify-center gap-1.5 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
+                <Shield className="w-4 h-4" /> Secure 256-bit UPI Gateway Protection
+              </p>
             </div>
           </div>
         </div>

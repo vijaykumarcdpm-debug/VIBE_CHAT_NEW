@@ -1841,11 +1841,9 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
       if (event === 'call:response') {
         const { callerId, accepted } = data;
         const callerSocket = ACTIVE_CONNECTIONS.get(callerId);
-        const originalCall = ACTIVE_CALLS.get(callerId);
-        const callType = originalCall?.type || 'audio';
         
         if (accepted) {
-          ACTIVE_CALLS.set(userId, { peerId: callerId, type: callType });
+          ACTIVE_CALLS.set(userId, { peerId: callerId, type: 'audio' }); // default
         } else {
           ACTIVE_CALLS.delete(callerId);
         }
@@ -1855,8 +1853,7 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
             event: 'call:response',
             data: {
               responderId: userId,
-              accepted,
-              type: callType
+              accepted
             }
           }));
         }
