@@ -42,33 +42,7 @@ export default function AudioVideoCall({
   const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const localPreviewTransform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
-  const localVideoStyle = {
-    // User-facing local preview is mirrored for natural self-view only.
-    // This CSS transform must not affect the actual outgoing stream.
-    transform: localPreviewTransform,
-    WebkitTransform: localPreviewTransform,
-    msTransform: localPreviewTransform,
-    transformOrigin: 'center center' as const,
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover' as const,
-    objectPosition: 'center center' as const,
-    display: 'block'
-  };
-  const remoteVideoStyle = {
-    // Remote video must never be mirrored; keep orientation as received from peer.
-    transform: 'none',
-    WebkitTransform: 'none',
-    msTransform: 'none',
-    transformOrigin: 'center center' as const,
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain' as const,
-    objectPosition: 'center center' as const,
-    backgroundColor: '#000',
-    display: 'block'
-  };
-
+  
   // Ref elements
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -80,12 +54,6 @@ export default function AudioVideoCall({
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const signalQueue = useRef<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const correctionRefs = useRef<{
-    canvas?: HTMLCanvasElement;
-    video?: HTMLVideoElement;
-    raf?: number;
-    correctedStream?: MediaStream;
-  } | null>(null);
 
   const defaultAvatarDataUrl = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`;
   const peerImageSrc = (peerPic && peerPic.trim()) ? peerPic : defaultAvatarDataUrl;
@@ -144,7 +112,7 @@ export default function AudioVideoCall({
           }
 
           setCallStatus(isCaller ? 'Ringing...' : 'Connecting WebRTC...');
-          await setupWebRTC(stream);
+          setupWebRTC(stream);
         } else {
           throw new Error('WebRTC API missing or insecure context (HTTPS required)');
         }
@@ -162,22 +130,6 @@ export default function AudioVideoCall({
       isComponentMounted = false;
       if (activeStream) {
         activeStream.getTracks().forEach((track) => track.stop());
-      }
-      // stop any corrected/canvas-based streams and resources
-      if (correctionRefs.current) {
-        try {
-          correctionRefs.current.correctedStream?.getTracks().forEach(t => t.stop());
-          if (correctionRefs.current.raf) cancelAnimationFrame(correctionRefs.current.raf);
-          if (correctionRefs.current.video) {
-            try { correctionRefs.current.video.pause(); } catch(e) {}
-            correctionRefs.current.video.srcObject = null;
-          }
-          correctionRefs.current.canvas = undefined;
-          correctionRefs.current.video = undefined;
-          correctionRefs.current.correctedStream = undefined;
-        } catch (e) {
-          console.warn('Error cleaning correction refs', e);
-        }
       }
       if (pcRef.current) {
         pcRef.current.close();
@@ -217,7 +169,7 @@ export default function AudioVideoCall({
     };
   }, [ws, peerId]);
 
-  const setupWebRTC = async (stream: MediaStream) => {
+  const setupWebRTC = (stream: MediaStream) => {
     const configuration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -228,68 +180,8 @@ export default function AudioVideoCall({
     const pc = new RTCPeerConnection(configuration);
     pcRef.current = pc;
 
-    // By default send the raw getUserMedia stream.
-    // For front-facing cameras, preserve the actual camera capture dimensions
-    // and remove local mirroring by drawing frames to a canvas only after metadata is available.
-    let outgoingStream: MediaStream = stream;
-
-    if (callType === 'video' && facingMode === 'user' && stream.getVideoTracks().length > 0) {
-      try {
-        const hiddenVideo = document.createElement('video');
-        hiddenVideo.muted = true;
-        hiddenVideo.autoplay = true;
-        hiddenVideo.playsInline = true;
-        hiddenVideo.srcObject = stream;
-
-        await new Promise<void>((resolve) => {
-          if (hiddenVideo.readyState >= 1 && hiddenVideo.videoWidth && hiddenVideo.videoHeight) {
-            resolve();
-          } else {
-            hiddenVideo.addEventListener('loadedmetadata', () => resolve(), { once: true });
-          }
-        });
-
-        const videoWidth = hiddenVideo.videoWidth || (stream.getVideoTracks()[0].getSettings().width as number) || 0;
-        const videoHeight = hiddenVideo.videoHeight || (stream.getVideoTracks()[0].getSettings().height as number) || 0;
-
-        if (videoWidth > 0 && videoHeight > 0) {
-          const canvas = document.createElement('canvas');
-          canvas.width = videoWidth;
-          canvas.height = videoHeight;
-          const ctx = canvas.getContext('2d');
-
-          const drawFrame = () => {
-            try {
-              if (!ctx) return;
-              ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height);
-            } catch (e) {
-              // drawing may fail early while video metadata loads
-            }
-            correctionRefs.current && (correctionRefs.current.raf = requestAnimationFrame(drawFrame));
-          };
-
-          hiddenVideo.play().catch(() => {});
-          drawFrame();
-
-          const corrected = (canvas as any).captureStream ? (canvas as any).captureStream(30) as MediaStream : null;
-          if (corrected) {
-            stream.getAudioTracks().forEach(t => corrected.addTrack(t));
-            outgoingStream = corrected;
-            correctionRefs.current = { canvas, video: hiddenVideo, raf: 0, correctedStream: corrected };
-          } else {
-            correctionRefs.current = null;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to create corrected outgoing stream, sending raw stream', e);
-        correctionRefs.current = null;
-      }
-    }
-
-    outgoingStream.getTracks().forEach((track) => {
-      pc.addTrack(track, outgoingStream);
+    stream.getTracks().forEach((track) => {
+      pc.addTrack(track, stream);
     });
 
     pc.ontrack = (event) => {
@@ -411,7 +303,7 @@ export default function AudioVideoCall({
   return (
     <div
       ref={containerRef}
-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100dvh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
+      className={`relative flex flex-col items-center justify-center w-full min-h-[500px] h-[100dvh] md:h-[620px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
         isFullscreen ? 'h-screen rounded-none border-none' : ''
       }`}
     >
@@ -473,35 +365,38 @@ export default function AudioVideoCall({
 
       {/* VIDEO / CANVAS INTERACTIVE DISPLAY GRID */}
       {callType === 'video' ? (
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-slate-900">
+        <div className="absolute inset-0 w-full h-full bg-slate-900">
           {/* Main Remote Feed Area */}
-          <div className="relative w-full h-full max-w-full max-h-full">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              style={remoteVideoStyle}
-              className="w-full h-full object-contain"
-            />
-
+          <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
+             <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                style={{ transform: 'none' }}
+                className="w-full h-full object-cover"
+              />
+            
             {/* User Label overlay */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-950/80 rounded-3xl border border-slate-800 px-4 py-3 text-center max-w-[calc(100%-2rem)]">
-              <div className="text-sm font-bold text-white">{peerName}</div>
-              {(peerCity || peerState) && (
-                <div className="text-[10px] text-slate-300 mt-1">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</div>
-              )}
+            <div className="absolute top-4 left-4 bg-slate-950/80 rounded-3xl border border-slate-800 px-4 py-3 text-left max-w-[calc(100%-2rem)]">
+            <div className="text-sm font-bold text-white">{peerName}</div>
+            {(peerCity || peerState) && (
+              <div className="text-[10px] text-slate-300 mt-1">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</div>
+            )}
+          </div>
+          <div className="absolute bottom-20 left-4 px-3 py-1 bg-slate-950/80 rounded-lg text-xs font-semibold text-white border border-slate-800">
+              {peerName}
             </div>
           </div>
 
           {/* Picture-In-Picture Local Feed Window */}
           {!isVideoOff && !errorMsg && (
-            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
+            <div className="absolute top-4 right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
                 <video
                   ref={localVideoRef}
                   autoPlay
                   playsInline
                   muted
-                  style={localVideoStyle}
+                  style={{ transform: localPreviewTransform }}
                   className="w-full h-full object-cover"
                 />
               <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-slate-950/60 rounded text-[9px] text-white">
@@ -512,7 +407,7 @@ export default function AudioVideoCall({
         </div>
       ) : (
         /* AUDIO ONLY CALL PULSING CARD */
-        <div className="relative flex flex-col items-center justify-center p-6 sm:p-12 text-center w-full h-full bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950/20">
+        <div className="relative flex flex-col items-center justify-center p-12 text-center w-full h-full bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950/20">
           <audio
             ref={remoteAudioRef}
             autoPlay
@@ -551,7 +446,7 @@ export default function AudioVideoCall({
       )}
 
       {/* INTERACTIVE CONTROLS BAR */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-nowrap overflow-x-auto w-full max-w-[calc(100vw-1rem)] z-20">
+      <div className="absolute bottom-6 flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-wrap w-fit max-w-[95%] z-20 mx-auto">
         {/* Toggle Audio Mute */}
         <button
           onClick={toggleMute}
