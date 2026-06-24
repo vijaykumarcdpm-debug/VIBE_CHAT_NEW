@@ -48,14 +48,25 @@ export default function AudioVideoCall({
     transform: localPreviewTransform,
     WebkitTransform: localPreviewTransform,
     msTransform: localPreviewTransform,
-    transformOrigin: 'center center' as const
+    transformOrigin: 'center center' as const,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const,
+    objectPosition: 'center center' as const,
+    display: 'block'
   };
   const remoteVideoStyle = {
     // Remote video must never be mirrored; keep orientation as received from peer.
     transform: 'none',
     WebkitTransform: 'none',
     msTransform: 'none',
-    transformOrigin: 'center center' as const
+    transformOrigin: 'center center' as const,
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain' as const,
+    objectPosition: 'center center' as const,
+    backgroundColor: '#000',
+    display: 'block'
   };
 
   // Ref elements
@@ -133,7 +144,7 @@ export default function AudioVideoCall({
           }
 
           setCallStatus(isCaller ? 'Ringing...' : 'Connecting WebRTC...');
-          setupWebRTC(stream);
+          await setupWebRTC(stream);
         } else {
           throw new Error('WebRTC API missing or insecure context (HTTPS required)');
         }
@@ -206,7 +217,7 @@ export default function AudioVideoCall({
     };
   }, [ws, peerId]);
 
-  const setupWebRTC = (stream: MediaStream) => {
+  const setupWebRTC = async (stream: MediaStream) => {
     const configuration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -218,9 +229,8 @@ export default function AudioVideoCall({
     pcRef.current = pc;
 
     // By default send the raw getUserMedia stream.
-    // However some front-facing cameras may present mirrored frames from the device.
-    // Ensure the outgoing stream is NOT mirrored: for front camera, draw video to a hidden canvas
-    // with a flip and captureStream() to produce an unmirrored stream for transmission.
+    // For front-facing cameras, preserve the actual camera capture dimensions
+    // and remove local mirroring by drawing frames to a canvas only after metadata is available.
     let outgoingStream: MediaStream = stream;
 
     if (callType === 'video' && facingMode === 'user' && stream.getVideoTracks().length > 0) {
@@ -231,49 +241,46 @@ export default function AudioVideoCall({
         hiddenVideo.playsInline = true;
         hiddenVideo.srcObject = stream;
 
-        // attempt to determine size from track settings
-        const settings = stream.getVideoTracks()[0].getSettings();
-        const width = (settings && (settings.width as number)) || 640;
-        const height = (settings && (settings.height as number)) || 480;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-
-        const drawFrame = () => {
-          try {
-            if (!ctx) return;
-            ctx.save();
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // flip horizontally to unmirror source
-            ctx.scale(-1, 1);
-            ctx.drawImage(hiddenVideo, -canvas.width, 0, canvas.width, canvas.height);
-            ctx.restore();
-          } catch (e) {
-            // drawing may fail early while video metadata loads
+        await new Promise<void>((resolve) => {
+          if (hiddenVideo.readyState >= 1 && hiddenVideo.videoWidth && hiddenVideo.videoHeight) {
+            resolve();
+          } else {
+            hiddenVideo.addEventListener('loadedmetadata', () => resolve(), { once: true });
           }
-          correctionRefs.current && (correctionRefs.current.raf = requestAnimationFrame(drawFrame));
-        };
-
-        // ensure video plays so drawImage has frames
-        hiddenVideo.addEventListener('loadedmetadata', () => {
-          hiddenVideo.play().catch(() => {});
-          drawFrame();
         });
 
-        // start attempting to play immediately (some browsers already have frames)
-        hiddenVideo.play().catch(() => {});
+        const videoWidth = hiddenVideo.videoWidth || (stream.getVideoTracks()[0].getSettings().width as number) || 0;
+        const videoHeight = hiddenVideo.videoHeight || (stream.getVideoTracks()[0].getSettings().height as number) || 0;
 
-        const corrected = (canvas as any).captureStream ? (canvas as any).captureStream(25) as MediaStream : null;
-        if (corrected) {
-          // include audio tracks from original stream
-          stream.getAudioTracks().forEach(t => corrected.addTrack(t));
-          outgoingStream = corrected;
-          correctionRefs.current = { canvas, video: hiddenVideo, raf: 0, correctedStream: corrected };
-        } else {
-          // fallback: keep original stream
-          correctionRefs.current = null;
+        if (videoWidth > 0 && videoHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = videoWidth;
+          canvas.height = videoHeight;
+          const ctx = canvas.getContext('2d');
+
+          const drawFrame = () => {
+            try {
+              if (!ctx) return;
+              ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height);
+            } catch (e) {
+              // drawing may fail early while video metadata loads
+            }
+            correctionRefs.current && (correctionRefs.current.raf = requestAnimationFrame(drawFrame));
+          };
+
+          hiddenVideo.play().catch(() => {});
+          drawFrame();
+
+          const corrected = (canvas as any).captureStream ? (canvas as any).captureStream(30) as MediaStream : null;
+          if (corrected) {
+            stream.getAudioTracks().forEach(t => corrected.addTrack(t));
+            outgoingStream = corrected;
+            correctionRefs.current = { canvas, video: hiddenVideo, raf: 0, correctedStream: corrected };
+          } else {
+            correctionRefs.current = null;
+          }
         }
       } catch (e) {
         console.warn('Failed to create corrected outgoing stream, sending raw stream', e);
@@ -474,7 +481,7 @@ export default function AudioVideoCall({
               autoPlay
               playsInline
               style={remoteVideoStyle}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
 
             {/* User Label overlay */}
