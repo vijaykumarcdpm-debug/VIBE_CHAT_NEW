@@ -246,26 +246,6 @@ export default function App() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'people' | 'chat' | 'lounge' | 'vip'>('people');
-
-  const showThemeModalRef = useRef<boolean>(false);
-  const showOwnProfileModalRef = useRef<boolean>(false);
-  const showNotificationsDropdownRef = useRef<boolean>(false);
-  const showExitConfirmRef = useRef<boolean>(false);
-  const incomingCallRef = useRef<any>(null);
-  const outgoingCallRef = useRef<any>(null);
-  const activeCallRef = useRef<any>(null);
-  const screenRef = useRef<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
-  const sidebarTabRef = useRef<'people' | 'chat' | 'lounge' | 'vip'>('people');
-  const isLoggedInRef = useRef<boolean>(!!token && !!me);
-
-  // Helper: open VIP upgrade flow when non-VIP taps a locked field
-  const handleVipFieldClick = (e?: any) => {
-    if (isUserVIP) return;
-    try { e?.preventDefault?.(); } catch (err) {}
-    try { setShowOwnProfileModal(false); } catch (err) {}
-    try { triggerVipPage(); } catch (err) {}
-  };
-
   const [notifications, setNotifications] = useState<any[]>([
     {
       id: 'notif-welcome',
@@ -295,6 +275,17 @@ export default function App() {
 
   const [screen, setScreen] = useState<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
   const [isAdminPortal, setIsAdminPortal] = useState<boolean>(window.location.pathname === '/admin');
+
+  useEffect(() => {
+    if (showNotificationsDropdown || showOwnProfileModal || showExitConfirm) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showNotificationsDropdown, showOwnProfileModal, showExitConfirm]);
 
   const [editUsername, setEditUsername] = useState<string>('');
   const [editGender, setEditGender] = useState<'Male' | 'Female' | 'Other'>('Other');
@@ -328,8 +319,6 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  const MAX_BIO_LENGTH = 50;
-
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUsername.trim()) {
@@ -341,9 +330,9 @@ export default function App() {
       showToast('Please enter a valid age of 18 or above.', true);
       return;
     }
-    const bioText = editBio.trim();
-    if (bioText.length > MAX_BIO_LENGTH) {
-      showToast(`Bio cannot exceed ${MAX_BIO_LENGTH} characters.`, true);
+    const bioWords = editBio.trim().split(/\s+/).filter(w => w.length > 0);
+    if (bioWords.length > 50) {
+      showToast('Bio cannot exceed 50 words.', true);
       return;
     }
 
@@ -367,22 +356,55 @@ export default function App() {
       });
 
       if (res.ok) {
-        localStorage.setItem('vibechat_rejoin_username', editUsername.trim());
-        localStorage.setItem('vibechat_rejoin_gender', editGender || '');
-        localStorage.setItem('vibechat_rejoin_city', editCity.trim());
-        localStorage.setItem('vibechat_rejoin_state', editState.trim());
-        localStorage.setItem('vibechat_rejoin_country', editCountry.trim());
-        localStorage.setItem('vibechat_rejoin_bio', editBio.trim());
-        localStorage.setItem('vibechat_rejoin_age', String(ageNum || 0));
 
-        if (editPic) {
-          localStorage.setItem('vibechat_rejoin_profilePic', editPic);
-        }
+  localStorage.setItem(
+    'vibechat_rejoin_username',
+    editUsername.trim()
+  );
 
-        showToast('Profile updated successfully!');
-        fetchLatestProfile();
-        setShowOwnProfileModal(false);
-      } else {
+  localStorage.setItem(
+    'vibechat_rejoin_gender',
+    editGender || ''
+  );
+
+  localStorage.setItem(
+    'vibechat_rejoin_city',
+    editCity.trim()
+  );
+
+  localStorage.setItem(
+    'vibechat_rejoin_state',
+    editState.trim()
+  );
+
+  localStorage.setItem(
+    'vibechat_rejoin_country',
+    editCountry.trim()
+  );
+
+  localStorage.setItem(
+    'vibechat_rejoin_bio',
+    editBio.trim()
+  );
+
+    localStorage.setItem(
+      'vibechat_rejoin_age',
+      String(ageNum || 0) // Ensure a number is stored, even if it's 0.
+    );
+
+  if (editPic) {
+    localStorage.setItem(
+      'vibechat_rejoin_profilePic',
+      editPic
+    );
+  }
+
+  showToast('Profile updated successfully!');
+
+  fetchLatestProfile();
+
+  setShowOwnProfileModal(false);
+} else {
         const errorData = await res.json();
         showToast(errorData.error || 'Failed to update profile.', true);
       }
@@ -422,34 +444,6 @@ export default function App() {
     isMatch?: boolean;
   } | null>(null);
 
-  // App-level realtime presence list (excludes current user when rendering)
-  const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
-
-  useEffect(() => {
-    showThemeModalRef.current = showThemeModal;
-    showOwnProfileModalRef.current = showOwnProfileModal;
-    showNotificationsDropdownRef.current = showNotificationsDropdown;
-    showExitConfirmRef.current = showExitConfirm;
-    incomingCallRef.current = incomingCall;
-    outgoingCallRef.current = outgoingCall;
-    activeCallRef.current = activeCall;
-    screenRef.current = screen;
-    sidebarTabRef.current = sidebarTab;
-    isLoggedInRef.current = !!token && !!me;
-  }, [
-    showThemeModal,
-    showOwnProfileModal,
-    showNotificationsDropdown,
-    showExitConfirm,
-    incomingCall,
-    outgoingCall,
-    activeCall,
-    screen,
-    sidebarTab,
-    token,
-    me
-  ]);
-
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
   const [isChatActiveMobile, setIsChatActiveMobile] = useState<boolean>(false);
 
@@ -464,38 +458,24 @@ export default function App() {
         return;
       }
 
-      if (activeCallRef.current || incomingCallRef.current) {
+      if (activeCall || incomingCall) {
         e.preventDefault();
         e.returnValue = 'You are in an active session. Are you sure you want to leave?';
         return e.returnValue;
       }
 
-      if (screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
+      if (screen === 'lobby' && sidebarTab === 'people' && !showExitConfirm) {
         // Let the Android back handler show the exit confirmation.
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    if (isLoggedInRef.current) {
-      if (!isVibeAppState(window.history.state)) {
-        pushAppRootState();
-        pushAppGuardState();
-      } else if (!window.history.state.appGuard) {
-        pushAppGuardState();
-      }
+    if (!isVibeAppState(window.history.state)) {
+      pushAppRootState();
+      pushAppGuardState();
+    } else if (!window.history.state.appGuard) {
+      pushAppGuardState();
     }
-
-    const restoreAppGuard = () => {
-      try {
-        if (!isVibeAppState(window.history.state)) {
-          pushAppGuardState();
-        } else {
-          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
-        }
-      } catch (err) {
-        console.warn('Unable to restore app history state:', err);
-      }
-    };
 
     const handlePopState = (e: PopStateEvent) => {
       if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
@@ -505,66 +485,59 @@ export default function App() {
 
       const currentState = e.state;
       const isAppState = isVibeAppState(currentState);
+      const isGuardState = isAppState && currentState.appGuard === true;
+      const isRootState = isAppState && currentState.appRoot === true;
 
-      const closeOpenOverlay = () => {
-        if (showThemeModalRef.current) {
-          setShowThemeModal(false);
-          return true;
+      const restoreAppGuard = () => {
+        try {
+          pushAppGuardState();
+        } catch (err) {
+          console.warn('Unable to restore app history state:', err);
         }
-        if (showOwnProfileModalRef.current) {
-          setShowOwnProfileModal(false);
-          return true;
-        }
-        if (showNotificationsDropdownRef.current) {
-          setShowNotificationsDropdown(false);
-          return true;
-        }
-        if (showExitConfirmRef.current) {
-          setShowExitConfirm(false);
-          return true;
-        }
-        if (incomingCallRef.current) {
-          setIncomingCall(null);
-          return true;
-        }
-        if (outgoingCallRef.current) {
-          setOutgoingCall(null);
-          return true;
-        }
-        if (activeCallRef.current) {
-          setActiveCall(null);
-          setScreen('lobby');
-          setSidebarTab('people');
-          return true;
-        }
-        return false;
       };
 
       if (!isAppState) {
-        if (!isLoggedInRef.current) {
-          return;
-        }
-
-        if (closeOpenOverlay()) {
-          restoreAppGuard();
-          return;
-        }
-
-        if (screenRef.current !== 'lobby' || sidebarTabRef.current !== 'people') {
-          setScreen('lobby');
-          setSidebarTab('people');
-          restoreAppGuard();
-          return;
-        }
-
-        if (!showExitConfirmRef.current) {
-          setShowExitConfirm(true);
-        }
         restoreAppGuard();
         return;
       }
 
-      if (closeOpenOverlay()) {
+      if (showThemeModal) {
+        setShowThemeModal(false);
+        restoreAppGuard();
+        return;
+      }
+      if (showOwnProfileModal) {
+        setShowOwnProfileModal(false);
+        restoreAppGuard();
+        return;
+      }
+      if (showNotificationsDropdown) {
+        setShowNotificationsDropdown(false);
+        restoreAppGuard();
+        return;
+      }
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        restoreAppGuard();
+        return;
+      }
+
+      if (incomingCall) {
+        setIncomingCall(null);
+        restoreAppGuard();
+        return;
+      }
+      if (outgoingCall) {
+        setOutgoingCall(null);
+        restoreAppGuard();
+        return;
+      }
+
+      if (activeCall) {
+        setActiveCall(null);
+        setScreen('lobby');
+        setSidebarTab('people');
+        restoreAppGuard();
         return;
       }
 
@@ -575,29 +548,31 @@ export default function App() {
         const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || evt.detail.handled === true;
         if (handled) {
           window.sessionStorage.removeItem('vibe_back_handled');
+          restoreAppGuard();
           return;
         }
 
-        if (!isLoggedInRef.current) {
-          return;
-        }
-
-        if (screenRef.current !== 'lobby') {
+        if (screen !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
+          restoreAppGuard();
           return;
         }
 
-        if (sidebarTabRef.current !== 'people') {
+        if (sidebarTab !== 'people') {
           setSidebarTab('people');
+          restoreAppGuard();
           return;
         }
 
-        if (showThemeModalRef.current || showOwnProfileModalRef.current || showNotificationsDropdownRef.current) {
+        if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
+          // should already be handled, but double-check
+          restoreAppGuard();
           return;
         }
 
         setShowExitConfirm(true);
+        restoreAppGuard();
       }, 0);
     };
     
@@ -607,84 +582,36 @@ export default function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
-
-  useEffect(() => {
-    if (!token || !me) return;
-    if (screen === 'lobby' && sidebarTab === 'people') {
-      try {
-        if (window.history.state?.vibe_app === true) {
-          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
-        } else {
-          window.history.pushState({ vibe_app: true, appGuard: true }, '');
-        }
-      } catch (err) {
-        console.warn('Unable to preserve app history guard for People Lobby:', err);
-      }
-    }
-  }, [screen, sidebarTab, token, me]);
+  }, [activeCall, incomingCall, screen, sidebarTab, showThemeModal, showOwnProfileModal, showNotificationsDropdown, showExitConfirm]);
 
   // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
   // This handler MUST mark events as handled to prevent app exit
   useEffect(() => {
-    const restoreAppGuard = () => {
-      try {
-        if (window.history.state && (window.history.state as any).vibe_app === true) {
-          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
-        } else {
-          window.history.pushState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
-        }
-      } catch (err) {
-        console.warn('Unable to restore app history state:', err);
-      }
-    };
-
-    const markAndroidBackHandled = (evt: Event) => {
-      try {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
-      } catch (e) {}
-      if (evt && typeof evt === 'object') {
-        try {
-          (evt as any).detail = (evt as any).detail || {};
-          (evt as any).detail.handled = true;
-        } catch (e) {}
-      }
-    };
-
     const handleAndroidBack = (evt: Event) => {
-      if (!isLoggedInRef.current) {
-        // Join Gateway / unauthenticated entry should never show exit confirmation.
-        return;
-      }
-
-      // If an app-level modal is open, close it immediately, mark handled, and restore history guard
-      if (showExitConfirmRef.current) {
+      // If an app-level modal is open, close it immediately and mark handled
+      if (showExitConfirm) {
         setShowExitConfirm(false);
-        markAndroidBackHandled(evt);
-        restoreAppGuard();
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
 
-      if (showThemeModalRef.current || showOwnProfileModalRef.current || showNotificationsDropdownRef.current) {
-        if (showThemeModalRef.current) setShowThemeModal(false);
-        if (showOwnProfileModalRef.current) setShowOwnProfileModal(false);
-        if (showNotificationsDropdownRef.current) setShowNotificationsDropdown(false);
-        markAndroidBackHandled(evt);
-        restoreAppGuard();
+      if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
+        if (showThemeModal) setShowThemeModal(false);
+        if (showOwnProfileModal) setShowOwnProfileModal(false);
+        if (showNotificationsDropdown) setShowNotificationsDropdown(false);
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
 
-      // If incoming or outgoing call overlay is present, close it first and restore history guard
-      if (incomingCallRef.current) {
+      // If incoming or outgoing call overlay is present, close it first
+      if (incomingCall) {
         setIncomingCall(null);
-        markAndroidBackHandled(evt);
-        restoreAppGuard();
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
-      if (outgoingCallRef.current) {
+      if (outgoingCall) {
         setOutgoingCall(null);
-        markAndroidBackHandled(evt);
-        restoreAppGuard();
+        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
         return;
       }
 
@@ -693,86 +620,65 @@ export default function App() {
         const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
         if (handled) {
           window.sessionStorage.removeItem('vibe_back_handled');
-          restoreAppGuard();
           return;
         }
 
-        if (showThemeModalRef.current) {
+        if (showThemeModal) {
           setShowThemeModal(false);
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
-        if (showOwnProfileModalRef.current) {
+        if (showOwnProfileModal) {
           setShowOwnProfileModal(false);
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
-        if (showNotificationsDropdownRef.current) {
+        if (showNotificationsDropdown) {
           setShowNotificationsDropdown(false);
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
-        if (showExitConfirmRef.current) {
+        if (showExitConfirm) {
           setShowExitConfirm(false);
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
 
-        if (incomingCallRef.current) {
+        if (incomingCall) {
           setIncomingCall(null);
           setScreen('lobby');
           setSidebarTab('people');
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
-        if (outgoingCallRef.current) {
+        if (outgoingCall) {
           setOutgoingCall(null);
           setScreen('lobby');
           setSidebarTab('people');
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
 
-        if (activeCallRef.current) {
+        if (activeCall) {
           const confirmLeave = window.confirm("You are in an active call. Are you sure you want to go back and disconnect?");
           if (confirmLeave) {
             handleHangupCall();
           }
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
 
-        if (screenRef.current !== 'lobby') {
+        if (screen !== 'lobby') {
           setScreen('lobby');
           setSidebarTab('people');
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
 
-        if (sidebarTabRef.current !== 'people') {
+        if (sidebarTab !== 'people') {
           setSidebarTab('people');
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
           return;
         }
 
         setShowExitConfirm(true);
-        markAndroidBackHandled(evt);
-        restoreAppGuard();
       }, 50);
     };
 
     window.addEventListener('app_hardware_back', handleAndroidBack as EventListener);
     return () => window.removeEventListener('app_hardware_back', handleAndroidBack as EventListener);
-  }, []);
+  }, [showExitConfirm, showThemeModal, showOwnProfileModal, showNotificationsDropdown, activeCall, incomingCall, screen, sidebarTab]);
 
   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
@@ -874,7 +780,7 @@ export default function App() {
     const isModerator = localStorage.getItem('vibechat_rejoin_isModerator') === 'true';
     const photoVerified = localStorage.getItem('vibechat_rejoin_photoVerified') === 'true';
 
-    const snapshot = {
+    return {
       id: localStorage.getItem('vibechat_rejoin_id') || '',
       username,
       type,
@@ -892,65 +798,46 @@ export default function App() {
       photoVerified: photoVerified || undefined,
       blockedUsers: []
     };
-
-    try { console.log('[REJOIN TRACE] STEP 2: loadRejoinSnapshot =>', snapshot); } catch (e) {}
-    return snapshot;
   };
 
   const attemptGuestRejoinFromStoredDevice = async (): Promise<boolean> => {
     const snapshot = loadRejoinSnapshot();
     const deviceId = typeof window !== 'undefined' ? localStorage.getItem('vibechat_device_id') : null;
 
-    try { console.log('[REJOIN TRACE] STEP 5: Entering attemptGuestRejoinFromStoredDevice. snapshot=', snapshot); } catch (e) {}
-    try { console.log('[REJOIN TRACE] STEP 3: vibechat_device_id present=', !!deviceId); } catch (e) {}
-
-    // snapshot.id is not required for server-side guest rejoin (server matches by username+deviceId)
-    if (!snapshot || snapshot.type !== 'Guest' || !snapshot.username || !deviceId) {
-      try { console.log('[REJOIN TRACE] attemptGuestRejoinFromStoredDevice -> missing snapshot or deviceId, aborting rejoin'); } catch (e) {}
+    if (!snapshot || snapshot.type !== 'Guest' || !snapshot.username || !snapshot.id || !deviceId) {
       return false;
     }
 
     try {
-      const reqBody = {
-        username: snapshot.username,
-        gender: snapshot.gender,
-        age: snapshot.age,
-        city: snapshot.city,
-        state: snapshot.state,
-        country: snapshot.country,
-        profilePic: snapshot.profilePic,
-        deviceId
-      };
-      try { console.log('[REJOIN TRACE] STEP 5: /api/auth/guest request body =', reqBody); } catch (e) {}
-
       const res = await fetch('/api/auth/guest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqBody)
+        body: JSON.stringify({
+          username: snapshot.username,
+          gender: snapshot.gender,
+          age: snapshot.age,
+          city: snapshot.city,
+          state: snapshot.state,
+          country: snapshot.country,
+          profilePic: snapshot.profilePic,
+          deviceId
+        })
       });
 
-      try { console.log('[REJOIN TRACE] STEP 6: /api/auth/guest HTTP status =', res.status); } catch (e) {}
-
       if (!res.ok) {
-        try { console.log('[REJOIN TRACE] /api/auth/guest returned not ok; status=', res.status); } catch (e) {}
         return false;
       }
 
       const body = await res.json();
-      try { console.log('[REJOIN TRACE] /api/auth/guest response body =', body); } catch (e) {}
       const updatedProfile = body.user;
       const token = body.token;
       if (!token || !updatedProfile) {
-        try { console.log('[REJOIN TRACE] /api/auth/guest missing token or user in response'); } catch (e) {}
         return false;
       }
 
-      try { console.log('[REJOIN TRACE] STEP 8: about to setToken (guest rejoin) with token=', token); } catch (e) {}
       localStorage.setItem('vibechat_token', token);
       tokenRef.current = token;
       setToken(token);
-
-      try { console.log('[REJOIN TRACE] STEP 7: saveRejoinSnapshot executing now'); } catch (e) {}
       saveRejoinSnapshot(updatedProfile, token);
       setMe(updatedProfile);
       setDetectedGeo({
@@ -968,7 +855,6 @@ export default function App() {
   };
 
   const saveRejoinSnapshot = (profile: Partial<UserProfile>, token: string) => {
-    try { console.log('[REJOIN TRACE] saveRejoinSnapshot called with profile=', profile, ' token=', token ? '***present***' : 'null'); } catch (e) {}
     if (!token) return;
     if (profile.id) {
       localStorage.setItem('vibechat_rejoin_id', profile.id);
@@ -1013,7 +899,6 @@ export default function App() {
     } else if (!localStorage.getItem('vibechat_rejoin_createdAt')) {
       localStorage.setItem('vibechat_rejoin_createdAt', new Date().toISOString());
     }
-    try { console.log('[REJOIN TRACE] saveRejoinSnapshot finished writing rejoin keys'); } catch (e) {}
   };
 
   useEffect(() => {
@@ -1035,7 +920,6 @@ export default function App() {
   const fetchLatestProfile = async () => {
     // Read token from localStorage to avoid race condition with tokenRef sync
     const currentToken = getActiveAuthToken();
-    try { console.log('[REJOIN TRACE] STEP 9: fetchLatestProfile begin. currentToken present=', !!currentToken); } catch (e) {}
     if (!currentToken || currentToken.trim().length === 0) {
       clearAuthRetryTimer();
       return;
@@ -1045,7 +929,6 @@ export default function App() {
       const res = await fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${currentToken}` }
       });
-      try { console.log('[REJOIN TRACE] STEP 10: /api/auth/me HTTP status =', res.status); } catch (e) {}
 
       if (res.ok) {
         const profile = await res.json();
@@ -1097,14 +980,10 @@ export default function App() {
           if (currentRejoinToken && currentRejoinToken === currentToken) {
             const restored = await attemptGuestRejoinFromStoredDevice();
             if (restored) {
-              try { console.log('[REJOIN TRACE] attemptGuestRejoinFromStoredDevice succeeded during fetchLatestProfile fallback'); } catch (e) {}
               return;
-            } else {
-              try { console.log('[REJOIN TRACE] attemptGuestRejoinFromStoredDevice FAILED during fetchLatestProfile fallback'); } catch (e) {}
             }
           }
-          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing active auth token and calling handleLogout');
-          try { console.log('[REJOIN TRACE] STEP 12: reason=auth rejected & rejoin failed -> initiating handleLogout cleanup'); } catch (e) {}
+          console.warn('[VibeChat Auth Error] User credentials rejected. Clearing active auth token.');
           localStorage.removeItem('vibechat_token');
           tokenRef.current = null;
           setToken(null);
@@ -1268,7 +1147,7 @@ export default function App() {
                 peerName: prevOrig.targetName,
                 peerPic: prevOrig.targetPic,
                 isCaller: true,
-                type: data.type || prevOrig.type
+                type: prevOrig.type
               });
               showToast('Stranger accepted call. Connecting lines...');
             } else if (!data.accepted) {
@@ -1304,36 +1183,6 @@ export default function App() {
     };
 
     setWs(socket);
-    // Lightweight presence listener: update App-level presence list on chat:presence events
-    socket.addEventListener('message', (ev) => {
-      try {
-        const parsed = JSON.parse((ev as MessageEvent).data);
-        const { event, data } = parsed;
-        if (event === 'chat:presence') {
-          const payload = data;
-          setPresenceUsers(prev => {
-            const existing = Array.isArray(prev) ? prev : [];
-            if (!payload || !payload.userId) return existing;
-            if (!payload.online) {
-              return existing.filter(u => u.id !== payload.userId);
-            }
-            const already = existing.some(u => u.id === payload.userId);
-            const newUser = {
-              id: payload.userId,
-              username: payload.username || payload.name || '',
-              gender: payload.gender || payload.type,
-              type: payload.type,
-              profilePic: payload.profilePic,
-              bio: payload.bio || '',
-              online: true
-            };
-            if (already) return existing.map(u => u.id === payload.userId ? { ...u, online: true, ...payload } : u);
-            return [newUser, ...existing.filter(u => u.id !== payload.userId)];
-          });
-          try { fetchStats(); } catch (e) {}
-        }
-      } catch (e) {}
-    });
   };
 
   const closeSocket = () => {
@@ -1396,7 +1245,9 @@ export default function App() {
 
       if (res.ok) {
         const body = await res.json();
-        const profile = body.user || {
+        localStorage.setItem('vibechat_token', body.token);
+        setToken(body.token);
+        saveRejoinSnapshot(body.user || {
           id: body.user?.id || '',
           username: userName,
           type: 'Guest',
@@ -1407,14 +1258,7 @@ export default function App() {
           profilePic: profilePic || '',
           age: age || undefined,
           bio: ''
-        };
-        localStorage.setItem('vibechat_token', body.token);
-        tokenRef.current = body.token;
-        setToken(body.token);
-        setMe(profile);
-        setScreen('lobby');
-        setSidebarTab('people');
-        saveRejoinSnapshot(profile, body.token);
+        }, body.token);
         fetchStats();
         showToast(`Welcome Guest, ${userName}!`);
       } else {
@@ -1465,11 +1309,8 @@ export default function App() {
     if (res.ok) {
       const body = await res.json();
       localStorage.setItem('vibechat_token', body.token);
-      tokenRef.current = body.token;
       setToken(body.token);
-      setMe(body.user);
-      setScreen('lobby');
-      setSidebarTab('people');
+      tokenRef.current = body.token;
       saveRejoinSnapshot(body.user, body.token);
       fetchStats();
       showToast(`Welcome Back, ${body.user.type === 'Admin' ? 'VibeChat ADMIN' : body.user.username}! Secure connection approved.`);
@@ -1489,11 +1330,8 @@ export default function App() {
     if (res.ok) {
       const body = await res.json();
       localStorage.setItem('vibechat_token', body.token);
-      tokenRef.current = body.token;
       setToken(body.token);
-      setMe(body.user);
-      setScreen('lobby');
-      setSidebarTab('people');
+      tokenRef.current = body.token;
       saveRejoinSnapshot(body.user, body.token);
       fetchStats();
       showToast(`Congratulations ${body.user.type === 'Admin' ? 'VibeChat ADMIN' : body.user.username}, account setup successful!`);
@@ -1625,10 +1463,6 @@ export default function App() {
 
   const isUserAdmin = me?.type === 'Admin';
   const isUserVIP = me?.type === 'Royal VIP' || me?.type === 'Admin' || me?.type === 'Moderator';
-  const isPlansScreen = screen === 'plans';
-  const isPeopleScreen = screen === 'lobby' && sidebarTab === 'people';
-  const isChatScreen = screen === 'lobby' && sidebarTab === 'chat';
-  const isLoungeScreen = screen === 'lobby' && sidebarTab === 'lounge';
 
   return (
     <div id="app-root-container" className={`h-[100dvh] w-full max-w-[100vw] overflow-hidden font-sans antialiased flex flex-col justify-between theme-transition ${
@@ -1651,8 +1485,8 @@ export default function App() {
       )}
 
       {activeCall && (
-        <div className="modal-overlay bg-[#070B16] z-50">
-          <div className="modal-card full-screen-call-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
+        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
+          <div className="mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -1666,7 +1500,7 @@ export default function App() {
               peerCity={activeCall.peerCity}
               peerState={activeCall.peerState}
               peerCountry={activeCall.peerCountry}
-              onNextMatch={activeCall?.isMatch ? handleNextStranger : undefined}
+              onNextMatch={activeCall?.isMatch && activeCall?.type === 'audio' ? handleNextStranger : undefined}
             />
           </div>
         </div>
@@ -1752,8 +1586,8 @@ export default function App() {
       )}
 
       {!rulesAgreed && me && (
-        <div className="modal-overlay bg-slate-950/90 backdrop-blur-md z-[110] animate-fade-in">
-          <div className={`modal-card mx-auto w-full max-w-md max-h-[95dvh] scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
+          <div className={`mx-auto w-full max-w-md max-h-[95vh] overflow-y-auto min-h-0 scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/10 blur-xl rounded-full pointer-events-none"></div>
             
             <div className="text-4xl">📜</div>
@@ -1793,8 +1627,8 @@ export default function App() {
       )}
 
       {adminChangesNotice && (
-        <div className="modal-overlay bg-slate-950/85 backdrop-blur-md z-[160] animate-fade-in text-slate-100">
-          <div className={`modal-card mx-auto w-full max-w-sm max-h-[90dvh] border rounded-3xl p-6 relative shadow-2xl ${
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[160] flex items-center justify-center p-4 overflow-y-auto touch-pan-y animate-fade-in text-slate-100">
+          <div className={`mx-auto w-full max-w-sm max-h-[90vh] overflow-y-auto min-h-0 border rounded-3xl p-6 relative shadow-2xl ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-xl' : 'bg-slate-905 border-slate-800 text-slate-100 shadow-black/90'
           }`}>
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-500"></div>
@@ -1839,8 +1673,8 @@ export default function App() {
       )}
 
       {showOwnProfileModal && me && (
-        <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-[110] animate-fade-in text-slate-100">
-          <div className={`modal-card mx-auto w-full max-w-lg max-h-[95dvh] scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100">
+          <div className={`mx-auto w-full max-w-lg max-h-[95vh] overflow-y-auto min-h-0 scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
           }`}>
             <button
@@ -1851,8 +1685,7 @@ export default function App() {
             </button>
             <div className="absolute top-0 right-0 w-24 h-24 bg-violet-600/5 blur-xl rounded-full pointer-events-none"></div>
             
-            <div className="modal-card-body">
-              <form onSubmit={handleSaveProfile} className="space-y-3 font-display">
+            <form onSubmit={handleSaveProfile} className="space-y-3 font-display">
               <div className="text-center">
                 <h3 className={`text-lg font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Edit Profile Info</h3>
                 <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Manage Your Public Identity</p>
@@ -1924,16 +1757,12 @@ export default function App() {
                   <textarea
                     rows={1}
                     value={editBio}
-                    maxLength={MAX_BIO_LENGTH}
-                    onChange={(e) => setEditBio(e.target.value.slice(0, MAX_BIO_LENGTH))}
+                    onChange={(e) => setEditBio(e.target.value)}
                     placeholder="Type interesting details about yourself..."
                     className={`w-full text-xs p-2 rounded-xl outline-none border transition resize-none ${
                       theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 placeholder-slate-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500 placeholder-slate-500'
                     }`}
                   />
-                  <div className={`mt-2 text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {editBio.trim().length}/{MAX_BIO_LENGTH} characters
-                  </div>
                 </div>
 
                 <div>
@@ -1941,26 +1770,16 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>City</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
-                    <input
-                      type="text"
-                      value={editCity}
-                      onChange={(e) => setEditCity(e.target.value)}
-                      disabled={!isUserVIP}
-                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
-                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
-                      }`}
-                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
-                    />
-                    {!isUserVIP && (
-                      <button
-                        type="button"
-                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
-                        className="absolute inset-0 rounded-xl bg-transparent"
-                        aria-label="Upgrade to VIP to edit city"
-                      />
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    disabled={!isUserVIP}
+                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+                    }`}
+                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+                  />
                 </div>
 
                 <div>
@@ -1968,26 +1787,16 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>State</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
-                    <input
-                      type="text"
-                      value={editState}
-                      onChange={(e) => setEditState(e.target.value)}
-                      disabled={!isUserVIP}
-                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
-                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
-                      }`}
-                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
-                    />
-                    {!isUserVIP && (
-                      <button
-                        type="button"
-                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
-                        className="absolute inset-0 rounded-xl bg-transparent"
-                        aria-label="Upgrade to VIP to edit state"
-                      />
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value)}
+                    disabled={!isUserVIP}
+                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+                    }`}
+                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+                  />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1995,26 +1804,16 @@ export default function App() {
                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Country</label>
                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
                   </div>
-                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
-                    <input
-                      type="text"
-                      value={editCountry}
-                      onChange={(e) => setEditCountry(e.target.value)}
-                      disabled={!isUserVIP}
-                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
-                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
-                      }`}
-                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
-                    />
-                    {!isUserVIP && (
-                      <button
-                        type="button"
-                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
-                        className="absolute inset-0 rounded-xl bg-transparent"
-                        aria-label="Upgrade to VIP to edit country"
-                      />
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    value={editCountry}
+                    onChange={(e) => setEditCountry(e.target.value)}
+                    disabled={!isUserVIP}
+                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+                    }`}
+                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+                  />
                 </div>
               </div>
 
@@ -2063,7 +1862,6 @@ export default function App() {
             </form>
           </div>
         </div>
-      </div>
       )}
 
       {!token || !me ? (
@@ -2203,7 +2001,7 @@ export default function App() {
                   </button>
 
                   {showNotificationsDropdown && (
-                    <div className={`fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-3 sm:w-80 max-h-[80dvh] sm:max-h-[400px] overflow-y-auto rounded-2xl shadow-2xl border z-[100] animate-fade-in origin-top-right ${
+                    <div className={`fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-3 sm:w-80 max-h-[80vh] sm:max-h-[400px] overflow-y-auto rounded-2xl shadow-2xl border z-[100] animate-fade-in origin-top-right ${
                       theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
                     }`}>
                       <div className={`p-4 border-b font-bold tracking-tight ${theme === 'light' ? 'border-slate-100 text-slate-800' : 'border-slate-800 text-white'}`}>
@@ -2307,7 +2105,7 @@ export default function App() {
           <main className="flex-1 min-h-0 py-0 sm:py-6 relative z-10 flex flex-col justify-center items-center overflow-hidden w-full max-w-full">
             <div className="absolute top-0 right-0 w-[500px] h-[400px] bg-gradient-to-tr from-violet-600/5 via-indigo-600/3 to-transparent blur-[120px] pointer-events-none rounded-full"></div>
             
-            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden pb-20 sm:pb-0">
+            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden">
               
               <div className={`w-full max-w-full flex flex-col flex-1 min-h-0 sm:rounded-[2rem] overflow-hidden shadow-2xl transition duration-300 sm:border ${
                   theme === 'light'
@@ -2365,6 +2163,74 @@ export default function App() {
                         />
                       )}
 
+                      {(screen === 'lobby' || screen === 'plans') && (
+                        <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden ${isChatActiveMobile ? 'hidden md:flex' : ''} ${
+                          theme === 'light' ? 'bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/50 backdrop-blur-md border-violet-900/30'
+                        }`}>
+                          <button
+                            onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                              screen === 'lobby' && sidebarTab === 'people'
+                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <div className="relative shrink-0">
+                              <Users className="w-5 h-5" />
+                              {globalStats && (
+                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
+                                  {globalStats.totalOnline}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                              screen === 'lobby' && sidebarTab === 'chat'
+                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <div className="relative shrink-0">
+                              <MessageSquare className="w-5 h-5" />
+                              {unreadChatCount > 0 && (
+                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
+                                  {unreadChatCount}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
+                              screen === 'lobby' && sidebarTab === 'lounge'
+                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <Smile className="w-5 h-5 shrink-0" />
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+                              screen === 'plans'
+                                ? 'bg-amber-500/10 text-amber-500 shadow-inner'
+                                : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
+                            }`}
+                          >
+                            <Sparkles className="w-5 h-5 shrink-0" />
+                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
+                          </button>
+                        </nav>
+                      )}
+        
                       {screen === 'admin' && isUserAdmin && (
                         <AdminPanel
                           onBack={() => { setScreen('lobby'); setSidebarTab('people'); }}
@@ -2380,118 +2246,42 @@ export default function App() {
             </div>
           </main>
 
-          {screen === 'lobby' && !isChatActiveMobile && (
-            <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
-              theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
-            }`}>
-              <button
-                onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                  screen === 'lobby' && sidebarTab === 'people'
-                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}>
-                <div className="relative shrink-0">
-                  <Users className="w-5 h-5" />
-                  {globalStats && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
-                      {globalStats.totalOnline}
-                    </span>
-                  )}
-                </div>
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
-              </button>
-
-              <button
-                onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                  screen === 'lobby' && sidebarTab === 'chat'
-                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}>
-                <div className="relative shrink-0">
-                  <MessageSquare className="w-5 h-5" />
-                  {unreadChatCount > 0 && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
-                      {unreadChatCount}
-                    </span>
-                  )}
-                </div>
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
-              </button>
-
-              <button
-                onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
-                  screen === 'lobby' && sidebarTab === 'lounge'
-                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
-                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}>
-                <Smile className="w-5 h-5 shrink-0" />
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
-              </button>
-
-              <button
-                onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
-                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
-                  isPlansScreen
-                    ? 'bg-amber-500/10 text-amber-500 shadow-inner'
-                    : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
-                }`}>
-                <Sparkles className="w-5 h-5 shrink-0" />
-                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
-              </button>
-            </nav>
-          )}
-
           {/* Footer - Only show before login on public pages */}
         </div>
       )}
+      
+      </div>
 
       {showExitConfirm && (
-        <div className={`modal-overlay text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
-          <div className={`modal-card mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90dvh] space-y-6 shadow-2xl relative min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
-            <button
-              type="button"
-              onClick={() => setShowExitConfirm(false)}
-              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
-              aria-label="Close exit confirmation"
-            >
-              ✕
-            </button>
-            <div className="modal-card-body">
-              <div className="text-4xl mb-2">🚪</div>
-              <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
-                Are you sure you want to quit?
-              </h3>
-              <p className={`text-sm mb-6 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
-                You are about to exit the application.
-              </p>
-            </div>
-            <div className="modal-card-footer">
-              <div className="flex gap-3 justify-center select-none">
-                <button
-                  onClick={() => setShowExitConfirm(false)}
-                  className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition ${theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
-                >
-                  No, Stay
-                </button>
-                <button
-                  onClick={() => {
-                    setShowExitConfirm(false);
-                    handleLogout();
-                  }}
-                  className="flex-1 py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition"
-                >
-                  Yes, Quit
-                </button>
-              </div>
+        <div className={`fixed inset-0 backdrop-blur-md z-[200] overflow-y-auto touch-pan-y p-4 text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
+          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+            <div className="text-4xl mb-2">🚪</div>
+            <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
+              Are you sure you want to quit?
+            </h3>
+            <p className={`text-sm mb-6 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
+              You are about to exit the application.
+            </p>
+            <div className="flex gap-3 justify-center select-none">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition ${theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
+              >
+                No, Stay
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  handleLogout();
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition"
+              >
+                Yes, Quit
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
-  </div>
   );
 }

@@ -1,0 +1,179 @@
+commit 5c15ac9a142aa295289131dec445c0bf3bdba251
+Author: vijaykumarcdpm-debug <vijaykumarcdpm@gmail.com>
+Date:   Sat Jun 20 18:02:44 2026 +0530
+
+    Fix mobile popup layout, Android back navigation, call UI and modal improvements
+
+diff --git a/src/App.tsx b/src/App.tsx
+index 24573e6..f8ccd69 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1508,7 +1508,7 @@ export default function App() {
+ 
+       {incomingCall && (
+         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
+-          <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
++          <div className={`p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+             <div className="relative mx-auto w-16 h-16">
+               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+               <img
+@@ -1554,7 +1554,7 @@ export default function App() {
+ 
+       {outgoingCall && (
+         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
+-          <div className={`p-8 border rounded-3xl max-w-xs w-full space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
++          <div className={`p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+             <div className="relative mx-auto w-16 h-16">
+               <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+               <img
+@@ -2254,7 +2254,7 @@ export default function App() {
+ 
+       {showExitConfirm && (
+         <div className={`fixed inset-0 backdrop-blur-md z-[200] overflow-y-auto touch-pan-y p-4 text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
+-          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
++          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90vh] space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+             <div className="text-4xl mb-2">🚪</div>
+             <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
+               Are you sure you want to quit?
+diff --git a/src/components/AudioVideoCall.tsx b/src/components/AudioVideoCall.tsx
+index 344128f..fc3a44e 100644
+--- a/src/components/AudioVideoCall.tsx
++++ b/src/components/AudioVideoCall.tsx
+@@ -303,7 +303,7 @@ export default function AudioVideoCall({
+   return (
+     <div
+       ref={containerRef}
+-      className={`relative flex flex-col items-center justify-center w-full min-h-[500px] h-[100dvh] md:h-[620px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
++      className={`relative flex flex-col items-center justify-center w-full h-full min-h-[420px] md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
+         isFullscreen ? 'h-screen rounded-none border-none' : ''
+       }`}
+     >
+@@ -365,32 +365,29 @@ export default function AudioVideoCall({
+ 
+       {/* VIDEO / CANVAS INTERACTIVE DISPLAY GRID */}
+       {callType === 'video' ? (
+-        <div className="absolute inset-0 w-full h-full bg-slate-900">
++        <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-slate-900">
+           {/* Main Remote Feed Area */}
+-          <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
+-             <video
+-                ref={remoteVideoRef}
+-                autoPlay
+-                playsInline
+-                style={{ transform: 'none' }}
+-                className="w-full h-full object-cover"
+-              />
+-            
++          <div className="relative w-full h-full max-w-full max-h-full">
++            <video
++              ref={remoteVideoRef}
++              autoPlay
++              playsInline
++              style={{ transform: 'none' }}
++              className="w-full h-full object-cover"
++            />
++
+             {/* User Label overlay */}
+-            <div className="absolute top-4 left-4 bg-slate-950/80 rounded-3xl border border-slate-800 px-4 py-3 text-left max-w-[calc(100%-2rem)]">
+-            <div className="text-sm font-bold text-white">{peerName}</div>
+-            {(peerCity || peerState) && (
+-              <div className="text-[10px] text-slate-300 mt-1">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</div>
+-            )}
+-          </div>
+-          <div className="absolute bottom-20 left-4 px-3 py-1 bg-slate-950/80 rounded-lg text-xs font-semibold text-white border border-slate-800">
+-              {peerName}
++            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-950/80 rounded-3xl border border-slate-800 px-4 py-3 text-center max-w-[calc(100%-2rem)]">
++              <div className="text-sm font-bold text-white">{peerName}</div>
++              {(peerCity || peerState) && (
++                <div className="text-[10px] text-slate-300 mt-1">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</div>
++              )}
+             </div>
+           </div>
+ 
+           {/* Picture-In-Picture Local Feed Window */}
+           {!isVideoOff && !errorMsg && (
+-            <div className="absolute top-4 right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
++            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
+                 <video
+                   ref={localVideoRef}
+                   autoPlay
+@@ -407,7 +404,7 @@ export default function AudioVideoCall({
+         </div>
+       ) : (
+         /* AUDIO ONLY CALL PULSING CARD */
+-        <div className="relative flex flex-col items-center justify-center p-12 text-center w-full h-full bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950/20">
++        <div className="relative flex flex-col items-center justify-center p-6 sm:p-12 text-center w-full h-full bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950/20">
+           <audio
+             ref={remoteAudioRef}
+             autoPlay
+@@ -446,7 +443,7 @@ export default function AudioVideoCall({
+       )}
+ 
+       {/* INTERACTIVE CONTROLS BAR */}
+-      <div className="absolute bottom-6 flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-wrap w-fit max-w-[95%] z-20 mx-auto">
++      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-wrap w-fit max-w-[95%] z-20">
+         {/* Toggle Audio Mute */}
+         <button
+           onClick={toggleMute}
+diff --git a/src/components/VipPlansPage.tsx b/src/components/VipPlansPage.tsx
+index edcccac..97eac8f 100644
+--- a/src/components/VipPlansPage.tsx
++++ b/src/components/VipPlansPage.tsx
+@@ -44,10 +44,7 @@ export default function VipPlansPage({
+   useEffect(() => {
+     function handleAppHardwareBack(evt: any) {
+       if (selectedPlan) {
+-        setSelectedPlan(null);
+-        setScreenshot('');
+-        setScreenshotName('');
+-        setUploadError('');
++        closeSelectedPlan();
+         try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
+         if (evt && typeof evt === 'object') {
+           try { evt.detail = evt.detail || {}; evt.detail.handled = true; } catch (e) {}
+@@ -94,6 +91,27 @@ export default function VipPlansPage({
+     reader.readAsDataURL(file);
+   };
+ 
++  const openSelectedPlan = (plan: VIPPlan) => {
++    if (typeof window !== 'undefined') {
++      try {
++        window.history.pushState({ vibe_app: true, modalOpen: true }, "");
++      } catch (e) {}
++    }
++    setSelectedPlan(plan);
++  };
++
++  const closeSelectedPlan = () => {
++    if (typeof window !== 'undefined' && window.history.state?.modalOpen) {
++      try {
++        window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
++      } catch (e) {}
++    }
++    setSelectedPlan(null);
++    setScreenshot('');
++    setScreenshotName('');
++    setUploadError('');
++  };
++
+   const handleSubmit = async () => {
+     if (!selectedPlan) return;
+     if (!screenshot) {
+@@ -268,7 +286,7 @@ export default function VipPlansPage({
+             return (
+               <button
+                 key={pl.id}
+-                onClick={() => { try { window.history.pushState({ vibe_app: true, modalOpen: true }, ""); } catch (e) {} setSelectedPlan(pl); setSubmissionSuccess(false); }}
++                onClick={() => { openSelectedPlan(pl); setSubmissionSuccess(false); }}
+                 className={`plan-duration-card plan-duration-card-bg text-left p-4 rounded-2xl border-2 transition relative duration-200 cursor-pointer ${
+                   isSelected
+                     ? 'border-black scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+@@ -320,7 +338,7 @@ export default function VipPlansPage({
+                   Complete VIP Enrollment
+                 </h2>
+                 <button
+-                  onClick={() => { setSelectedPlan(null); setScreenshot(''); setScreenshotName(''); setUploadError(''); }}
++                  onClick={closeSelectedPlan}
+                   className={`p-2 rounded-full transition cursor-pointer ${theme === "light" ? "hover:bg-slate-100 text-slate-500" : "hover:bg-slate-800 text-slate-400"}`}
+                 >
+                   <X className="w-6 h-6" />

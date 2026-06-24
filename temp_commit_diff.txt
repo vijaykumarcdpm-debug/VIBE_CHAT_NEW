@@ -1,0 +1,226 @@
+commit 1f0c6eb9ab8a4da267839c6a64577b541ad5dbaf
+Author: vijaykumarcdpm-debug <vijaykumarcdpm@gmail.com>
+Date:   Mon Jun 22 01:09:40 2026 +0530
+
+    Fix back navigation, video call, presence, VIP navigation, and modal bugs
+
+diff --git a/src/App.tsx b/src/App.tsx
+index 38b1606..cadc4bb 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -422,6 +422,9 @@ export default function App() {
+     isMatch?: boolean;
+   } | null>(null);
+ 
++  // App-level realtime presence list (excludes current user when rendering)
++  const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
++
+   useEffect(() => {
+     showThemeModalRef.current = showThemeModal;
+     showOwnProfileModalRef.current = showOwnProfileModal;
+@@ -502,47 +505,66 @@ export default function App() {
+ 
+       const currentState = e.state;
+       const isAppState = isVibeAppState(currentState);
+-      if (!isAppState) {
+-        if (isLoggedInRef.current && screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
+-          setShowExitConfirm(true);
++
++      const closeOpenOverlay = () => {
++        if (showThemeModalRef.current) {
++          setShowThemeModal(false);
++          return true;
++        }
++        if (showOwnProfileModalRef.current) {
++          setShowOwnProfileModal(false);
++          return true;
++        }
++        if (showNotificationsDropdownRef.current) {
++          setShowNotificationsDropdown(false);
++          return true;
++        }
++        if (showExitConfirmRef.current) {
++          setShowExitConfirm(false);
++          return true;
++        }
++        if (incomingCallRef.current) {
++          setIncomingCall(null);
++          return true;
+         }
++        if (outgoingCallRef.current) {
++          setOutgoingCall(null);
++          return true;
++        }
++        if (activeCallRef.current) {
++          setActiveCall(null);
++          setScreen('lobby');
++          setSidebarTab('people');
++          return true;
++        }
++        return false;
++      };
++
++      if (!isAppState) {
+         if (!isLoggedInRef.current) {
+           return;
+         }
+-        restoreAppGuard();
+-        return;
+-      }
+ 
+-      if (showThemeModalRef.current) {
+-        setShowThemeModal(false);
+-        return;
+-      }
+-      if (showOwnProfileModalRef.current) {
+-        setShowOwnProfileModal(false);
+-        return;
+-      }
+-      if (showNotificationsDropdownRef.current) {
+-        setShowNotificationsDropdown(false);
+-        return;
+-      }
+-      if (showExitConfirmRef.current) {
+-        setShowExitConfirm(false);
+-        return;
+-      }
++        if (closeOpenOverlay()) {
++          restoreAppGuard();
++          return;
++        }
+ 
+-      if (incomingCallRef.current) {
+-        setIncomingCall(null);
+-        return;
+-      }
+-      if (outgoingCallRef.current) {
+-        setOutgoingCall(null);
++        if (screenRef.current !== 'lobby' || sidebarTabRef.current !== 'people') {
++          setScreen('lobby');
++          setSidebarTab('people');
++          restoreAppGuard();
++          return;
++        }
++
++        if (!showExitConfirmRef.current) {
++          setShowExitConfirm(true);
++        }
++        restoreAppGuard();
+         return;
+       }
+ 
+-      if (activeCallRef.current) {
+-        setActiveCall(null);
+-        setScreen('lobby');
+-        setSidebarTab('people');
++      if (closeOpenOverlay()) {
+         return;
+       }
+ 
+@@ -630,6 +652,11 @@ export default function App() {
+     };
+ 
+     const handleAndroidBack = (evt: Event) => {
++      if (!isLoggedInRef.current) {
++        // Join Gateway / unauthenticated entry should never show exit confirmation.
++        return;
++      }
++
+       // If an app-level modal is open, close it immediately, mark handled, and restore history guard
+       if (showExitConfirmRef.current) {
+         setShowExitConfirm(false);
+@@ -1250,6 +1277,36 @@ export default function App() {
+     };
+ 
+     setWs(socket);
++    // Lightweight presence listener: update App-level presence list on chat:presence events
++    socket.addEventListener('message', (ev) => {
++      try {
++        const parsed = JSON.parse((ev as MessageEvent).data);
++        const { event, data } = parsed;
++        if (event === 'chat:presence') {
++          const payload = data;
++          setPresenceUsers(prev => {
++            const existing = Array.isArray(prev) ? prev : [];
++            if (!payload || !payload.userId) return existing;
++            if (!payload.online) {
++              return existing.filter(u => u.id !== payload.userId);
++            }
++            const already = existing.some(u => u.id === payload.userId);
++            const newUser = {
++              id: payload.userId,
++              username: payload.username || payload.name || '',
++              gender: payload.gender || payload.type,
++              type: payload.type,
++              profilePic: payload.profilePic,
++              bio: payload.bio || '',
++              online: true
++            };
++            if (already) return existing.map(u => u.id === payload.userId ? { ...u, online: true, ...payload } : u);
++            return [newUser, ...existing.filter(u => u.id !== payload.userId)];
++          });
++          try { fetchStats(); } catch (e) {}
++        }
++      } catch (e) {}
++    });
+   };
+ 
+   const closeSocket = () => {
+diff --git a/src/components/AudioVideoCall.tsx b/src/components/AudioVideoCall.tsx
+index f6a0c51..de2af88 100644
+--- a/src/components/AudioVideoCall.tsx
++++ b/src/components/AudioVideoCall.tsx
+@@ -81,10 +81,8 @@ export default function AudioVideoCall({
+ 
+   const processSignal = async (signal: any, pc: RTCPeerConnection) => {
+     try {
+-      // Accept either full SDP blocks or ICE candidates
+       if (signal.sdp) {
+         await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+-        // If remote is an offer, generate an answer
+         if (pc.remoteDescription?.type === 'offer') {
+           const answer = await pc.createAnswer();
+           await pc.setLocalDescription(answer);
+@@ -96,12 +94,7 @@ export default function AudioVideoCall({
+           }
+         }
+       } else if (signal.candidate) {
+-        try {
+-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+-        } catch (e) {
+-          // Some browsers may emit null candidates or duplicates; guard and log
+-          console.warn('Ignored invalid ICE candidate', e);
+-        }
++        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+       }
+     } catch (err) {
+       console.warn('Error processing signal:', err);
+@@ -188,20 +181,15 @@ export default function AudioVideoCall({
+     const handleSignaling = (e: MessageEvent) => {
+       try {
+         const { event, data } = JSON.parse(e.data);
+-        if (event === 'webrtc:signal') {
+-          // tolerate multiple server payload shapes for sender id
+-          const senderId = data?.senderId || data?.callerId || data?.from || data?.sender || data?.ownerId;
+-          const targetId = data?.targetId || data?.recipientId;
+-          // If this message is from our peer or targeted to us, process it
+-          if (senderId === peerId || targetId === userId || (senderId && peerId && senderId === peerId)) {
+-            const { signal } = data;
+-            if (pcRef.current) {
+-              processSignal(signal, pcRef.current);
+-            } else {
+-              signalQueue.current.push(signal);
+-            }
++        if (event === 'webrtc:signal' && data.senderId === peerId) {
++          const { signal } = data;
++          
++          if (pcRef.current) {
++            processSignal(signal, pcRef.current);
++          } else {
++            signalQueue.current.push(signal);
+           }
+-        } else if (event === 'call:hangup' && (data.senderId === peerId || data.callerId === peerId || data.from === peerId)) {
++        } else if (event === 'call:hangup' && data.senderId === peerId) {
+           setCallStatus('Finished');
+           setTimeout(() => {
+             onHangup();
