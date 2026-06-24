@@ -174,14 +174,6 @@
     min-height: 0 !important;
   }
 
-  .modal-overlay > .modal-card.full-screen-call-card {
-    height: 100% !important;
-    max-height: 100% !important;
-    min-height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
   .modal-overlay .modal-card-body {
     overflow-y: auto !important;
     overflow-x: hidden !important;
@@ -209,27 +201,6 @@
 
   .modal-card .modal-close-button:hover {
     opacity: 0.95 !important;
-  }
-
-  .vip-payment-modal-card {
-    height: calc(100dvh - 4rem) !important;
-    max-height: calc(100dvh - 4rem) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .call-controls-bar {
-    flex-wrap: nowrap !important;
-    white-space: nowrap !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-  }
-
-  .call-controls-bar::-webkit-scrollbar {
-    width: 0 !important;
-    height: 0 !important;
-    display: none !important;
   }
 }
 
