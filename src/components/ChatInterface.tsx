@@ -642,17 +642,22 @@ export default function ChatInterface({
     (activePartner?.id ? isUserOnline(activePartner.id) : false)
   );
   const partnerInSameConversation = chatIsActive && !!activePartner;
-  // Restore original live ONLINE yellow indicator for presence
-  const partnerStatusDotClass = partnerOnline
+  const partnerStatusDotClass = partnerInSameConversation
     ? 'bg-amber-400'
-    : 'bg-rose-500';
+    : partnerOnline
+      ? 'bg-emerald-500'
+      : 'bg-rose-500';
 
-  const partnerStatusTextClass = partnerOnline
+  const partnerStatusTextClass = partnerInSameConversation
     ? 'text-amber-400'
-    : 'text-rose-500';
-  const partnerStatusLabel = partnerOnline
+    : partnerOnline
+      ? 'text-emerald-500'
+      : 'text-rose-500';
+  const partnerStatusLabel = partnerInSameConversation
     ? '🟡 ONLINE'
-    : '● OFFLINE';
+    : partnerOnline
+      ? '● ONLINE'
+      : '● OFFLINE';
   const inspectedIsOnline = Boolean(
     inspectedFullDetails?.online === true ||
     inspectedPeer?.online === true ||
@@ -1509,7 +1514,7 @@ export default function ChatInterface({
   const filteredOnline = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (term) {
-      return backendSearchResults.filter(ou => (me.type === 'Admin' || ou.id !== me.id) && !me.blockedUsers?.includes(ou.id));
+      return backendSearchResults.filter(ou => ou.id !== me.id && !me.blockedUsers?.includes(ou.id));
     }
 
     const allKnownUsers = new Map<string, any>();
@@ -1532,25 +1537,9 @@ export default function ChatInterface({
       allKnownUsers.set(ou.id, { ...ou, online: true, bio: ou.bio || ou.description || '' });
     });
 
-    if (me && !allKnownUsers.has(me.id)) {
-      allKnownUsers.set(me.id, {
-        id: me.id,
-        username: me.username,
-        gender: me.gender,
-        type: me.type,
-        profilePic: me.profilePic,
-        city: me.city || '',
-        state: me.state || '',
-        country: me.country || '',
-        bio: me.bio || '',
-        online: true,
-        lastSeenAt: me.lastSeenAt
-      });
-    }
-
     // Offline users only appear in search
     const mergedUsers = Array.from(allKnownUsers.values())
-      .filter(ou => !me.blockedUsers?.includes(ou.id))
+      .filter(ou => ou.id !== me.id && !me.blockedUsers?.includes(ou.id))
       .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
 
     return mergedUsers
