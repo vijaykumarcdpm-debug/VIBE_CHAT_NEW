@@ -642,22 +642,17 @@ export default function ChatInterface({
     (activePartner?.id ? isUserOnline(activePartner.id) : false)
   );
   const partnerInSameConversation = chatIsActive && !!activePartner;
-  const partnerStatusDotClass = partnerInSameConversation
+  // Restore original live ONLINE yellow indicator for presence
+  const partnerStatusDotClass = partnerOnline
     ? 'bg-amber-400'
-    : partnerOnline
-      ? 'bg-emerald-500'
-      : 'bg-rose-500';
+    : 'bg-rose-500';
 
-  const partnerStatusTextClass = partnerInSameConversation
+  const partnerStatusTextClass = partnerOnline
     ? 'text-amber-400'
-    : partnerOnline
-      ? 'text-emerald-500'
-      : 'text-rose-500';
-  const partnerStatusLabel = partnerInSameConversation
+    : 'text-rose-500';
+  const partnerStatusLabel = partnerOnline
     ? '🟡 ONLINE'
-    : partnerOnline
-      ? '● ONLINE'
-      : '● OFFLINE';
+    : '● OFFLINE';
   const inspectedIsOnline = Boolean(
     inspectedFullDetails?.online === true ||
     inspectedPeer?.online === true ||

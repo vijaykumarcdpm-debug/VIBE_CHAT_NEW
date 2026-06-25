@@ -432,7 +432,7 @@ export default function AudioVideoCall({
 
           {/* Picture-In-Picture Local Feed Window */}
           {!isVideoOff && !errorMsg && (
-            <div className="absolute top-4 right-4 w-28 sm:w-44 h-40 sm:h-48 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
+            <div className="absolute top-4 right-4 w-28 sm:w-44 h-44 sm:h-52 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -441,7 +441,7 @@ export default function AudioVideoCall({
                 style={{ transform: localPreviewTransform }}
                 className="w-full h-full object-contain bg-black"
               />
-              <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-slate-950/60 rounded text-[9px] text-white">
+              <div className="absolute bottom-3 left-2 px-1.5 py-1 bg-slate-950/60 rounded text-[9px] text-white">
                 You
               </div>
             </div>
