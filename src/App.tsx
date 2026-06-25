@@ -1598,13 +1598,15 @@ export default function App() {
       <div className="flex-1 flex flex-col w-full max-w-[100vw] h-full min-h-0 overflow-hidden relative">
        
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 p-4 rounded-2xl border text-xs font-semibold shadow-2xl flex items-center gap-2 max-w-sm animate-fade-in ${
-          toast.isError
-            ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-            : 'bg-indigo-500/15 border-indigo-500/20 text-indigo-300'
-        }`}>
-          {toast.isError ? <AlertOctagon className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-          <span>{toast.text}</span>
+        <div className={`${(activeCall || incomingCall || outgoingCall) ? 'fixed inset-0 z-50 flex items-center justify-center' : 'fixed top-6 right-6 z-50'} p-4 animate-fade-in`}> 
+          <div className={`mx-auto rounded-2xl border text-xs font-semibold shadow-2xl flex items-center gap-2 max-w-sm ${
+            toast.isError
+              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+              : 'bg-indigo-500/15 border-indigo-500/20 text-indigo-300'
+          }`}>
+            {toast.isError ? <AlertOctagon className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+            <span>{toast.text}</span>
+          </div>
         </div>
       )}
 
