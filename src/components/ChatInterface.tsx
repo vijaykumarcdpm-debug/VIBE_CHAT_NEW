@@ -641,7 +641,7 @@ export default function ChatInterface({
     activePartner?.online === true ||
     (activePartner?.id ? isUserOnline(activePartner.id) : false)
   );
-  const partnerInSameConversation = chatIsActive && !!activePartner;
+  const partnerInSameConversation = chatIsActive && !!activePartner && partnerFocused;
   const partnerStatusDotClass = partnerInSameConversation
     ? 'bg-amber-400'
     : partnerOnline
