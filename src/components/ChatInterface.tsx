@@ -68,6 +68,7 @@ interface ChatInterfaceProps {
   onEditProfile: () => void;
   setUnreadMessageCount?: (count: number) => void;
   onChatActiveChange?: (isActive: boolean) => void;
+  isAppOverlayOpen?: boolean;
 }
 
 export default function ChatInterface({
@@ -91,13 +92,18 @@ export default function ChatInterface({
   setNotifications,
   onEditProfile,
   setUnreadMessageCount,
-  onChatActiveChange
+  onChatActiveChange,
+  isAppOverlayOpen = false
 }: ChatInterfaceProps) {
   // Navigation / View states
   // 'idle' | 'searching' | 'matched' | 'direct' (private conversations with friends/recents)
   const [chatState, setChatState] = useState<'idle' | 'searching' | 'matched' | 'direct'>('idle');
   const [activePartner, setActivePartner] = useState<(Partial<UserProfile> & { isMatch?: boolean }) | null>(null);
   const [inspectedPeer, setInspectedPeer] = useState<any | null>(null);
+  const [recents, setRecents] = useState<RecentChat[]>([]);
+  const [recentChatsLimitLocked, setRecentChatsLimitLocked] = useState<boolean>(false);
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([]);
 
   const openModal = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
     if (typeof window !== 'undefined') {
@@ -312,6 +318,7 @@ export default function ChatInterface({
 
   // Menus
   const [partnerFocused, setPartnerFocused] = useState<boolean>(false);
+  const [isPageHidden, setIsPageHidden] = useState<boolean>(typeof document !== 'undefined' ? document.hidden : false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -437,74 +444,6 @@ export default function ChatInterface({
   };
 
   useEffect(() => {
-    if (!ws || !activePartner) {
-      setPartnerFocused(false);
-      return;
-    }
-    
-    // Join the focus room of the active partner
-    try {
-      ws.send(JSON.stringify({
-        event: 'chat:focus',
-        data: { recipientId: activePartner.id }
-      }));
-    } catch (e) {
-      console.error(e);
-    }
-    
-    // Clean up focus room on leave
-    return () => {
-      try {
-        ws.send(JSON.stringify({
-          event: 'chat:blur',
-          data: { recipientId: activePartner.id }
-        }));
-      } catch (e) {
-        console.error(e);
-      }
-      setPartnerFocused(false);
-    };
-  }, [activePartner, ws]);
-
-  useEffect(() => {
-    if (inspectedPeer || showThemeModal || showReportDialog) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [inspectedPeer, showThemeModal, showReportDialog]);
-
-  useEffect(() => {
-    if (!inspectedPeer) {
-      setInspectedFullDetails(null);
-      return;
-    }
-    const fetchFullProfile = async () => {
-      try {
-        const res = await fetch(`/api/users/profile/${inspectedPeer.id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const detail = await res.json();
-          setInspectedFullDetails(detail);
-        }
-      } catch (e) {
-        console.error('Failed fetching full companion profile details', e);
-      }
-    };
-    fetchFullProfile();
-  }, [inspectedPeer, token]);
-
-  // Lists
-  const [recents, setRecents] = useState<RecentChat[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
-  const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([]);
-  const [recentChatsLimitLocked, setRecentChatsLimitLocked] = useState<boolean>(false);
-
-  useEffect(() => {
     if (setUnreadMessageCount) {
       const totalUnread = recents.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
       setUnreadMessageCount(totalUnread);
@@ -604,6 +543,56 @@ export default function ChatInterface({
   const isVIP = me.type === 'Royal VIP' || me.type === 'Admin';
   const chatIsActive = chatState === 'matched' || chatState === 'direct';
   const isUserOnline = (userId?: string) => Boolean(userId && onlineUsers.some((u) => u.id === userId && u.online === true));
+  const localChatWindowIsActive = chatIsActive && !!activePartner && sidebarTab === 'chat' && !isPageHidden && !inspectedPeer && !showThemeModal && !showReportDialog && !showGalleryMenu && !showEmojiPicker && !isAppOverlayOpen;
+  const focusRoomActiveRef = useRef<boolean>(false);
+  const focusRecipientIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const sendBlur = (recipientId: string | null) => {
+      if (!recipientId || !ws || ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send(JSON.stringify({ event: 'chat:blur', data: { recipientId } }));
+      } catch (e) {
+        console.error('Failed to send chat:blur', e);
+      }
+    };
+
+    if (!ws) {
+      focusRoomActiveRef.current = false;
+      focusRecipientIdRef.current = null;
+      return;
+    }
+
+    if (localChatWindowIsActive && activePartner?.id) {
+      if (!focusRoomActiveRef.current || focusRecipientIdRef.current !== activePartner.id) {
+        if (focusRoomActiveRef.current && focusRecipientIdRef.current && focusRecipientIdRef.current !== activePartner.id) {
+          sendBlur(focusRecipientIdRef.current);
+        }
+        try {
+          ws.send(JSON.stringify({ event: 'chat:focus', data: { recipientId: activePartner.id } }));
+          focusRoomActiveRef.current = true;
+          focusRecipientIdRef.current = activePartner.id;
+        } catch (e) {
+          console.error('Failed to send chat:focus', e);
+        }
+      }
+      return;
+    }
+
+    if (focusRoomActiveRef.current) {
+      sendBlur(focusRecipientIdRef.current);
+      focusRoomActiveRef.current = false;
+      focusRecipientIdRef.current = null;
+    }
+
+    return () => {
+      if (focusRoomActiveRef.current) {
+        sendBlur(focusRecipientIdRef.current);
+        focusRoomActiveRef.current = false;
+        focusRecipientIdRef.current = null;
+      }
+    };
+  }, [activePartner, localChatWindowIsActive, ws]);
 
   const updateOnlineUserList = (userId: string, online: boolean, payload?: any) => {
     setOnlineUsers(prev => {
@@ -641,7 +630,7 @@ export default function ChatInterface({
     activePartner?.online === true ||
     (activePartner?.id ? isUserOnline(activePartner.id) : false)
   );
-  const partnerInSameConversation = chatIsActive && !!activePartner && partnerFocused;
+  const partnerInSameConversation = localChatWindowIsActive && partnerFocused;
   const partnerStatusDotClass = partnerInSameConversation
     ? 'bg-amber-400'
     : partnerOnline
@@ -1232,6 +1221,7 @@ export default function ChatInterface({
   // Cancel matchmaking when user leaves the tab, closes the page, or component unmounts
   useEffect(() => {
     const handleVisibilityChange = () => {
+      setIsPageHidden(document.hidden);
       if (document.hidden && chatState === 'searching') {
         handleCancelMatching();
       }
@@ -1243,6 +1233,7 @@ export default function ChatInterface({
       }
     };
 
+    setIsPageHidden(document.hidden);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
 

@@ -2330,6 +2330,15 @@ export default function App() {
                           onEditProfile={() => setShowOwnProfileModal(true)}
                           setUnreadMessageCount={setUnreadChatCount}
                           onChatActiveChange={setIsChatActiveMobile}
+                          isAppOverlayOpen={
+                            showOwnProfileModal ||
+                            showNotificationsDropdown ||
+                            showThemeModal ||
+                            showExitConfirm ||
+                            Boolean(incomingCall) ||
+                            Boolean(outgoingCall) ||
+                            Boolean(activeCall)
+                          }
                         />
                       )}
         
