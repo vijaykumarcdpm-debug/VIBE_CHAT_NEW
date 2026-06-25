@@ -1,0 +1,1179 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index f8ccd69..8521285 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -246,6 +246,26 @@ export default function App() {
+   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
+   const [showExitConfirm, setShowExitConfirm] = useState(false);
+   const [sidebarTab, setSidebarTab] = useState<'people' | 'chat' | 'lounge' | 'vip'>('people');
++
++  const showThemeModalRef = useRef<boolean>(false);
++  const showOwnProfileModalRef = useRef<boolean>(false);
++  const showNotificationsDropdownRef = useRef<boolean>(false);
++  const showExitConfirmRef = useRef<boolean>(false);
++  const incomingCallRef = useRef<any>(null);
++  const outgoingCallRef = useRef<any>(null);
++  const activeCallRef = useRef<any>(null);
++  const screenRef = useRef<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
++  const sidebarTabRef = useRef<'people' | 'chat' | 'lounge' | 'vip'>('people');
++  const isLoggedInRef = useRef<boolean>(!!token && !!me);
++
++  // Helper: open VIP upgrade flow when non-VIP taps a locked field
++  const handleVipFieldClick = (e?: any) => {
++    if (isUserVIP) return;
++    try { e?.preventDefault?.(); } catch (err) {}
++    try { setShowOwnProfileModal(false); } catch (err) {}
++    try { triggerVipPage(); } catch (err) {}
++  };
++
+   const [notifications, setNotifications] = useState<any[]>([
+     {
+       id: 'notif-welcome',
+@@ -276,17 +296,6 @@ export default function App() {
+   const [screen, setScreen] = useState<'lobby' | 'plans' | 'geo' | 'admin'>('lobby');
+   const [isAdminPortal, setIsAdminPortal] = useState<boolean>(window.location.pathname === '/admin');
+ 
+-  useEffect(() => {
+-    if (showNotificationsDropdown || showOwnProfileModal || showExitConfirm) {
+-      document.body.style.overflow = 'hidden';
+-    } else {
+-      document.body.style.overflow = '';
+-    }
+-    return () => {
+-      document.body.style.overflow = '';
+-    };
+-  }, [showNotificationsDropdown, showOwnProfileModal, showExitConfirm]);
+-
+   const [editUsername, setEditUsername] = useState<string>('');
+   const [editGender, setEditGender] = useState<'Male' | 'Female' | 'Other'>('Other');
+   const [editBio, setEditBio] = useState<string>('');
+@@ -319,6 +328,8 @@ export default function App() {
+     reader.readAsDataURL(file);
+   };
+ 
++  const MAX_BIO_LENGTH = 50;
++
+   const handleSaveProfile = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!editUsername.trim()) {
+@@ -330,9 +341,9 @@ export default function App() {
+       showToast('Please enter a valid age of 18 or above.', true);
+       return;
+     }
+-    const bioWords = editBio.trim().split(/\s+/).filter(w => w.length > 0);
+-    if (bioWords.length > 50) {
+-      showToast('Bio cannot exceed 50 words.', true);
++    const bioText = editBio.trim();
++    if (bioText.length > MAX_BIO_LENGTH) {
++      showToast(`Bio cannot exceed ${MAX_BIO_LENGTH} characters.`, true);
+       return;
+     }
+ 
+@@ -356,55 +367,22 @@ export default function App() {
+       });
+ 
+       if (res.ok) {
++        localStorage.setItem('vibechat_rejoin_username', editUsername.trim());
++        localStorage.setItem('vibechat_rejoin_gender', editGender || '');
++        localStorage.setItem('vibechat_rejoin_city', editCity.trim());
++        localStorage.setItem('vibechat_rejoin_state', editState.trim());
++        localStorage.setItem('vibechat_rejoin_country', editCountry.trim());
++        localStorage.setItem('vibechat_rejoin_bio', editBio.trim());
++        localStorage.setItem('vibechat_rejoin_age', String(ageNum || 0));
++
++        if (editPic) {
++          localStorage.setItem('vibechat_rejoin_profilePic', editPic);
++        }
+ 
+-  localStorage.setItem(
+-    'vibechat_rejoin_username',
+-    editUsername.trim()
+-  );
+-
+-  localStorage.setItem(
+-    'vibechat_rejoin_gender',
+-    editGender || ''
+-  );
+-
+-  localStorage.setItem(
+-    'vibechat_rejoin_city',
+-    editCity.trim()
+-  );
+-
+-  localStorage.setItem(
+-    'vibechat_rejoin_state',
+-    editState.trim()
+-  );
+-
+-  localStorage.setItem(
+-    'vibechat_rejoin_country',
+-    editCountry.trim()
+-  );
+-
+-  localStorage.setItem(
+-    'vibechat_rejoin_bio',
+-    editBio.trim()
+-  );
+-
+-    localStorage.setItem(
+-      'vibechat_rejoin_age',
+-      String(ageNum || 0) // Ensure a number is stored, even if it's 0.
+-    );
+-
+-  if (editPic) {
+-    localStorage.setItem(
+-      'vibechat_rejoin_profilePic',
+-      editPic
+-    );
+-  }
+-
+-  showToast('Profile updated successfully!');
+-
+-  fetchLatestProfile();
+-
+-  setShowOwnProfileModal(false);
+-} else {
++        showToast('Profile updated successfully!');
++        fetchLatestProfile();
++        setShowOwnProfileModal(false);
++      } else {
+         const errorData = await res.json();
+         showToast(errorData.error || 'Failed to update profile.', true);
+       }
+@@ -444,6 +422,34 @@ export default function App() {
+     isMatch?: boolean;
+   } | null>(null);
+ 
++  // App-level realtime presence list (excludes current user when rendering)
++  const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
++
++  useEffect(() => {
++    showThemeModalRef.current = showThemeModal;
++    showOwnProfileModalRef.current = showOwnProfileModal;
++    showNotificationsDropdownRef.current = showNotificationsDropdown;
++    showExitConfirmRef.current = showExitConfirm;
++    incomingCallRef.current = incomingCall;
++    outgoingCallRef.current = outgoingCall;
++    activeCallRef.current = activeCall;
++    screenRef.current = screen;
++    sidebarTabRef.current = sidebarTab;
++    isLoggedInRef.current = !!token && !!me;
++  }, [
++    showThemeModal,
++    showOwnProfileModal,
++    showNotificationsDropdown,
++    showExitConfirm,
++    incomingCall,
++    outgoingCall,
++    activeCall,
++    screen,
++    sidebarTab,
++    token,
++    me
++  ]);
++
+   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+   const [isChatActiveMobile, setIsChatActiveMobile] = useState<boolean>(false);
+ 
+@@ -458,25 +464,39 @@ export default function App() {
+         return;
+       }
+ 
+-      if (activeCall || incomingCall) {
++      if (activeCallRef.current || incomingCallRef.current) {
+         e.preventDefault();
+         e.returnValue = 'You are in an active session. Are you sure you want to leave?';
+         return e.returnValue;
+       }
+ 
+-      if (screen === 'lobby' && sidebarTab === 'people' && !showExitConfirm) {
++      if (screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
+         // Let the Android back handler show the exit confirmation.
+       }
+     };
+     window.addEventListener('beforeunload', handleBeforeUnload);
+ 
+-    if (!isVibeAppState(window.history.state)) {
+-      pushAppRootState();
+-      pushAppGuardState();
+-    } else if (!window.history.state.appGuard) {
+-      pushAppGuardState();
++    if (isLoggedInRef.current) {
++      if (!isVibeAppState(window.history.state)) {
++        pushAppRootState();
++        pushAppGuardState();
++      } else if (!window.history.state.appGuard) {
++        pushAppGuardState();
++      }
+     }
+ 
++    const restoreAppGuard = () => {
++      try {
++        if (!isVibeAppState(window.history.state)) {
++          pushAppGuardState();
++        } else {
++          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
++        }
++      } catch (err) {
++        console.warn('Unable to restore app history state:', err);
++      }
++    };
++
+     const handlePopState = (e: PopStateEvent) => {
+       if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
+         window.sessionStorage.removeItem('vibe_allow_quit');
+@@ -485,59 +505,66 @@ export default function App() {
+ 
+       const currentState = e.state;
+       const isAppState = isVibeAppState(currentState);
+-      const isGuardState = isAppState && currentState.appGuard === true;
+-      const isRootState = isAppState && currentState.appRoot === true;
+ 
+-      const restoreAppGuard = () => {
+-        try {
+-          pushAppGuardState();
+-        } catch (err) {
+-          console.warn('Unable to restore app history state:', err);
++      const closeOpenOverlay = () => {
++        if (showThemeModalRef.current) {
++          setShowThemeModal(false);
++          return true;
++        }
++        if (showOwnProfileModalRef.current) {
++          setShowOwnProfileModal(false);
++          return true;
++        }
++        if (showNotificationsDropdownRef.current) {
++          setShowNotificationsDropdown(false);
++          return true;
++        }
++        if (showExitConfirmRef.current) {
++          setShowExitConfirm(false);
++          return true;
++        }
++        if (incomingCallRef.current) {
++          setIncomingCall(null);
++          return true;
++        }
++        if (outgoingCallRef.current) {
++          setOutgoingCall(null);
++          return true;
++        }
++        if (activeCallRef.current) {
++          setActiveCall(null);
++          setScreen('lobby');
++          setSidebarTab('people');
++          return true;
+         }
++        return false;
+       };
+ 
+       if (!isAppState) {
+-        restoreAppGuard();
+-        return;
+-      }
++        if (!isLoggedInRef.current) {
++          return;
++        }
+ 
+-      if (showThemeModal) {
+-        setShowThemeModal(false);
+-        restoreAppGuard();
+-        return;
+-      }
+-      if (showOwnProfileModal) {
+-        setShowOwnProfileModal(false);
+-        restoreAppGuard();
+-        return;
+-      }
+-      if (showNotificationsDropdown) {
+-        setShowNotificationsDropdown(false);
+-        restoreAppGuard();
+-        return;
+-      }
+-      if (showExitConfirm) {
+-        setShowExitConfirm(false);
+-        restoreAppGuard();
+-        return;
+-      }
++        if (closeOpenOverlay()) {
++          restoreAppGuard();
++          return;
++        }
+ 
+-      if (incomingCall) {
+-        setIncomingCall(null);
+-        restoreAppGuard();
+-        return;
+-      }
+-      if (outgoingCall) {
+-        setOutgoingCall(null);
++        if (screenRef.current !== 'lobby' || sidebarTabRef.current !== 'people') {
++          setScreen('lobby');
++          setSidebarTab('people');
++          restoreAppGuard();
++          return;
++        }
++
++        if (!showExitConfirmRef.current) {
++          setShowExitConfirm(true);
++        }
+         restoreAppGuard();
+         return;
+       }
+ 
+-      if (activeCall) {
+-        setActiveCall(null);
+-        setScreen('lobby');
+-        setSidebarTab('people');
+-        restoreAppGuard();
++      if (closeOpenOverlay()) {
+         return;
+       }
+ 
+@@ -548,31 +575,29 @@ export default function App() {
+         const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || evt.detail.handled === true;
+         if (handled) {
+           window.sessionStorage.removeItem('vibe_back_handled');
+-          restoreAppGuard();
+           return;
+         }
+ 
+-        if (screen !== 'lobby') {
++        if (!isLoggedInRef.current) {
++          return;
++        }
++
++        if (screenRef.current !== 'lobby') {
+           setScreen('lobby');
+           setSidebarTab('people');
+-          restoreAppGuard();
+           return;
+         }
+ 
+-        if (sidebarTab !== 'people') {
++        if (sidebarTabRef.current !== 'people') {
+           setSidebarTab('people');
+-          restoreAppGuard();
+           return;
+         }
+ 
+-        if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
+-          // should already be handled, but double-check
+-          restoreAppGuard();
++        if (showThemeModalRef.current || showOwnProfileModalRef.current || showNotificationsDropdownRef.current) {
+           return;
+         }
+ 
+         setShowExitConfirm(true);
+-        restoreAppGuard();
+       }, 0);
+     };
+     
+@@ -582,36 +607,84 @@ export default function App() {
+       window.removeEventListener('beforeunload', handleBeforeUnload);
+       window.removeEventListener('popstate', handlePopState);
+     };
+-  }, [activeCall, incomingCall, screen, sidebarTab, showThemeModal, showOwnProfileModal, showNotificationsDropdown, showExitConfirm]);
++  }, []);
++
++  useEffect(() => {
++    if (!token || !me) return;
++    if (screen === 'lobby' && sidebarTab === 'people') {
++      try {
++        if (window.history.state?.vibe_app === true) {
++          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
++        } else {
++          window.history.pushState({ vibe_app: true, appGuard: true }, '');
++        }
++      } catch (err) {
++        console.warn('Unable to preserve app history guard for People Lobby:', err);
++      }
++    }
++  }, [screen, sidebarTab, token, me]);
+ 
+   // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
+   // This handler MUST mark events as handled to prevent app exit
+   useEffect(() => {
++    const restoreAppGuard = () => {
++      try {
++        if (window.history.state && (window.history.state as any).vibe_app === true) {
++          window.history.replaceState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
++        } else {
++          window.history.pushState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
++        }
++      } catch (err) {
++        console.warn('Unable to restore app history state:', err);
++      }
++    };
++
++    const markAndroidBackHandled = (evt: Event) => {
++      try {
++        window.sessionStorage.setItem('vibe_back_handled', 'true');
++      } catch (e) {}
++      if (evt && typeof evt === 'object') {
++        try {
++          (evt as any).detail = (evt as any).detail || {};
++          (evt as any).detail.handled = true;
++        } catch (e) {}
++      }
++    };
++
+     const handleAndroidBack = (evt: Event) => {
+-      // If an app-level modal is open, close it immediately and mark handled
+-      if (showExitConfirm) {
++      if (!isLoggedInRef.current) {
++        // Join Gateway / unauthenticated entry should never show exit confirmation.
++        return;
++      }
++
++      // If an app-level modal is open, close it immediately, mark handled, and restore history guard
++      if (showExitConfirmRef.current) {
+         setShowExitConfirm(false);
+-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
++        markAndroidBackHandled(evt);
++        restoreAppGuard();
+         return;
+       }
+ 
+-      if (showThemeModal || showOwnProfileModal || showNotificationsDropdown) {
+-        if (showThemeModal) setShowThemeModal(false);
+-        if (showOwnProfileModal) setShowOwnProfileModal(false);
+-        if (showNotificationsDropdown) setShowNotificationsDropdown(false);
+-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
++      if (showThemeModalRef.current || showOwnProfileModalRef.current || showNotificationsDropdownRef.current) {
++        if (showThemeModalRef.current) setShowThemeModal(false);
++        if (showOwnProfileModalRef.current) setShowOwnProfileModal(false);
++        if (showNotificationsDropdownRef.current) setShowNotificationsDropdown(false);
++        markAndroidBackHandled(evt);
++        restoreAppGuard();
+         return;
+       }
+ 
+-      // If incoming or outgoing call overlay is present, close it first
+-      if (incomingCall) {
++      // If incoming or outgoing call overlay is present, close it first and restore history guard
++      if (incomingCallRef.current) {
+         setIncomingCall(null);
+-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
++        markAndroidBackHandled(evt);
++        restoreAppGuard();
+         return;
+       }
+-      if (outgoingCall) {
++      if (outgoingCallRef.current) {
+         setOutgoingCall(null);
+-        try { window.sessionStorage.setItem('vibe_back_handled', 'true'); } catch (e) {}
++        markAndroidBackHandled(evt);
++        restoreAppGuard();
+         return;
+       }
+ 
+@@ -620,65 +693,86 @@ export default function App() {
+         const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
+         if (handled) {
+           window.sessionStorage.removeItem('vibe_back_handled');
++          restoreAppGuard();
+           return;
+         }
+ 
+-        if (showThemeModal) {
++        if (showThemeModalRef.current) {
+           setShowThemeModal(false);
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+-        if (showOwnProfileModal) {
++        if (showOwnProfileModalRef.current) {
+           setShowOwnProfileModal(false);
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+-        if (showNotificationsDropdown) {
++        if (showNotificationsDropdownRef.current) {
+           setShowNotificationsDropdown(false);
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+-        if (showExitConfirm) {
++        if (showExitConfirmRef.current) {
+           setShowExitConfirm(false);
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+ 
+-        if (incomingCall) {
++        if (incomingCallRef.current) {
+           setIncomingCall(null);
+           setScreen('lobby');
+           setSidebarTab('people');
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+-        if (outgoingCall) {
++        if (outgoingCallRef.current) {
+           setOutgoingCall(null);
+           setScreen('lobby');
+           setSidebarTab('people');
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+ 
+-        if (activeCall) {
++        if (activeCallRef.current) {
+           const confirmLeave = window.confirm("You are in an active call. Are you sure you want to go back and disconnect?");
+           if (confirmLeave) {
+             handleHangupCall();
+           }
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+ 
+-        if (screen !== 'lobby') {
++        if (screenRef.current !== 'lobby') {
+           setScreen('lobby');
+           setSidebarTab('people');
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+ 
+-        if (sidebarTab !== 'people') {
++        if (sidebarTabRef.current !== 'people') {
+           setSidebarTab('people');
++          markAndroidBackHandled(evt);
++          restoreAppGuard();
+           return;
+         }
+ 
+         setShowExitConfirm(true);
++        markAndroidBackHandled(evt);
++        restoreAppGuard();
+       }, 50);
+     };
+ 
+     window.addEventListener('app_hardware_back', handleAndroidBack as EventListener);
+     return () => window.removeEventListener('app_hardware_back', handleAndroidBack as EventListener);
+-  }, [showExitConfirm, showThemeModal, showOwnProfileModal, showNotificationsDropdown, activeCall, incomingCall, screen, sidebarTab]);
++  }, []);
+ 
+   const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
+ 
+@@ -1147,7 +1241,7 @@ export default function App() {
+                 peerName: prevOrig.targetName,
+                 peerPic: prevOrig.targetPic,
+                 isCaller: true,
+-                type: prevOrig.type
++                type: data.type || prevOrig.type
+               });
+               showToast('Stranger accepted call. Connecting lines...');
+             } else if (!data.accepted) {
+@@ -1183,6 +1277,36 @@ export default function App() {
+     };
+ 
+     setWs(socket);
++    // Lightweight presence listener: update App-level presence list on chat:presence events
++    socket.addEventListener('message', (ev) => {
++      try {
++        const parsed = JSON.parse((ev as MessageEvent).data);
++        const { event, data } = parsed;
++        if (event === 'chat:presence') {
++          const payload = data;
++          setPresenceUsers(prev => {
++            const existing = Array.isArray(prev) ? prev : [];
++            if (!payload || !payload.userId) return existing;
++            if (!payload.online) {
++              return existing.filter(u => u.id !== payload.userId);
++            }
++            const already = existing.some(u => u.id === payload.userId);
++            const newUser = {
++              id: payload.userId,
++              username: payload.username || payload.name || '',
++              gender: payload.gender || payload.type,
++              type: payload.type,
++              profilePic: payload.profilePic,
++              bio: payload.bio || '',
++              online: true
++            };
++            if (already) return existing.map(u => u.id === payload.userId ? { ...u, online: true, ...payload } : u);
++            return [newUser, ...existing.filter(u => u.id !== payload.userId)];
++          });
++          try { fetchStats(); } catch (e) {}
++        }
++      } catch (e) {}
++    });
+   };
+ 
+   const closeSocket = () => {
+@@ -1485,8 +1609,8 @@ export default function App() {
+       )}
+ 
+       {activeCall && (
+-        <div className="fixed inset-0 bg-[#070B16] z-50 flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
+-          <div className="mx-auto w-full max-w-4xl max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0">
++        <div className="modal-overlay bg-[#070B16] z-50">
++          <div className="modal-card full-screen-call-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
+             <AudioVideoCall
+               ws={ws}
+               userId={me?.id || ''}
+@@ -1500,41 +1624,51 @@ export default function App() {
+               peerCity={activeCall.peerCity}
+               peerState={activeCall.peerState}
+               peerCountry={activeCall.peerCountry}
+-              onNextMatch={activeCall?.isMatch && activeCall?.type === 'audio' ? handleNextStranger : undefined}
++              onNextMatch={activeCall?.isMatch ? handleNextStranger : undefined}
+             />
+           </div>
+         </div>
+       )}
+ 
+       {incomingCall && (
+-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
+-          <div className={`p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+-            <div className="relative mx-auto w-16 h-16">
+-              <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+-              <img
+-                src={incomingCall.callerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+-                alt={incomingCall.callerName}
+-                className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
+-                referrerPolicy="no-referrer"
+-              />
+-            </div>
++        <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
++          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100dvh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
++            <button
++              type="button"
++              onClick={handleRejectCall}
++              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
++              aria-label="Close incoming call"
++            >
++              ✕
++            </button>
++            <div className="modal-card-body">
++              <div className="relative mx-auto w-16 h-16">
++                <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
++                <img
++                  src={incomingCall.callerPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
++                  alt={incomingCall.callerName}
++                  className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
++                  referrerPolicy="no-referrer"
++                />
++              </div>
+ 
+-            <div>
+-              {incomingCall.breakthrough && (
+-                <div className="absolute top-2 left-0 w-full flex justify-center -mt-6">
+-                  <span className="bg-amber-500 text-[9px] font-black tracking-widest text-white uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1 mx-auto w-max">
+-                    <Sparkles className="w-3 h-3" /> VIP Breakthrough
+-                  </span>
+-                </div>
+-              )}
+-              <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{incomingCall.callerName}</h3>
+-              <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
+-                <Volume2 className="w-3.5 h-3.5 animate-bounce" />
+-                Incoming {incomingCall.type} Call
+-              </p>
++              <div>
++                {incomingCall.breakthrough && (
++                  <div className="absolute top-2 left-0 w-full flex justify-center -mt-6">
++                    <span className="bg-amber-500 text-[9px] font-black tracking-widest text-white uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1 mx-auto w-max">
++                      <Sparkles className="w-3 h-3" /> VIP Breakthrough
++                    </span>
++                  </div>
++                )}
++                <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{incomingCall.callerName}</h3>
++                <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
++                  <Volume2 className="w-3.5 h-3.5 animate-bounce" />
++                  Incoming {incomingCall.type} Call
++                </p>
++              </div>
+             </div>
+ 
+-            <div className="flex gap-2">
++            <div className="modal-card-footer flex gap-2">
+               <button
+                 onClick={handleAcceptCall}
+                 className="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+@@ -1553,27 +1687,37 @@ export default function App() {
+       )}
+ 
+       {outgoingCall && (
+-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center animate-fade-in overflow-y-auto touch-pan-y">
+-          <div className={`p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100vh-4rem)] overflow-y-auto min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
+-            <div className="relative mx-auto w-16 h-16">
+-              <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
+-              <img
+-                src={outgoingCall.targetPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
+-                alt={outgoingCall.targetName}
+-                className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
+-                referrerPolicy="no-referrer"
+-              />
+-            </div>
++        <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in">
++          <div className={`modal-card p-8 border rounded-3xl max-w-xs w-full max-h-[calc(100dvh-4rem)] min-h-0 space-y-6 shadow-2xl relative ${theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black'}`}>
++            <button
++              type="button"
++              onClick={() => setOutgoingCall(null)}
++              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
++              aria-label="Cancel outgoing call"
++            >
++              ✕
++            </button>
++            <div className="modal-card-body">
++              <div className="relative mx-auto w-16 h-16">
++                <span className="absolute inset-0 bg-violet-600/25 rounded-full animate-ping"></span>
++                <img
++                  src={outgoingCall.targetPic || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%238B5CF6'/></svg>`}
++                  alt={outgoingCall.targetName}
++                  className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover relative border border-violet-500/30"
++                  referrerPolicy="no-referrer"
++                />
++              </div>
+ 
+-            <div>
+-              <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{outgoingCall.targetName}</h3>
+-              <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
+-                <Phone className="w-3.5 h-3.5 animate-pulse" />
+-                Calling...
+-              </p>
++              <div>
++                <h3 className={`text-lg font-bold font-display ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{outgoingCall.targetName}</h3>
++                <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 flex items-center justify-center gap-1 ${theme === 'light' ? 'text-violet-600' : 'text-violet-400'}`}>
++                  <Phone className="w-3.5 h-3.5 animate-pulse" />
++                  Calling...
++                </p>
++              </div>
+             </div>
+ 
+-            <div>
++            <div className="modal-card-footer">
+               <button
+                 onClick={() => setOutgoingCall(null)}
+                 className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-lg"
+@@ -1586,8 +1730,8 @@ export default function App() {
+       )}
+ 
+       {!rulesAgreed && me && (
+-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 overflow-y-auto touch-pan-y">
+-          <div className={`mx-auto w-full max-w-md max-h-[95vh] overflow-y-auto min-h-0 scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
++        <div className="modal-overlay bg-slate-950/90 backdrop-blur-md z-[110] animate-fade-in">
++          <div className={`modal-card mx-auto w-full max-w-md max-h-[95dvh] scrollbar-thin border rounded-3xl p-8 space-y-6 shadow-2xl relative text-center ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}`}>
+             <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/10 blur-xl rounded-full pointer-events-none"></div>
+             
+             <div className="text-4xl">📜</div>
+@@ -1627,8 +1771,8 @@ export default function App() {
+       )}
+ 
+       {adminChangesNotice && (
+-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[160] flex items-center justify-center p-4 overflow-y-auto touch-pan-y animate-fade-in text-slate-100">
+-          <div className={`mx-auto w-full max-w-sm max-h-[90vh] overflow-y-auto min-h-0 border rounded-3xl p-6 relative shadow-2xl ${
++        <div className="modal-overlay bg-slate-950/85 backdrop-blur-md z-[160] animate-fade-in text-slate-100">
++          <div className={`modal-card mx-auto w-full max-w-sm max-h-[90dvh] border rounded-3xl p-6 relative shadow-2xl ${
+             theme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-xl' : 'bg-slate-905 border-slate-800 text-slate-100 shadow-black/90'
+           }`}>
+             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-500"></div>
+@@ -1673,8 +1817,8 @@ export default function App() {
+       )}
+ 
+       {showOwnProfileModal && me && (
+-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110] overflow-y-auto touch-pan-y p-4 animate-fade-in text-slate-100">
+-          <div className={`mx-auto w-full max-w-lg max-h-[95vh] overflow-y-auto min-h-0 scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
++        <div className="modal-overlay bg-slate-950/80 backdrop-blur-sm z-[110] animate-fade-in text-slate-100">
++          <div className={`modal-card mx-auto w-full max-w-lg max-h-[95dvh] scrollbar-thin rounded-3xl p-6 relative shadow-2xl border transition duration-300 ${
+             theme === 'light' ? 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50' : 'bg-slate-900 border-slate-800 text-white shadow-black/80'
+           }`}>
+             <button
+@@ -1685,7 +1829,8 @@ export default function App() {
+             </button>
+             <div className="absolute top-0 right-0 w-24 h-24 bg-violet-600/5 blur-xl rounded-full pointer-events-none"></div>
+             
+-            <form onSubmit={handleSaveProfile} className="space-y-3 font-display">
++            <div className="modal-card-body">
++              <form onSubmit={handleSaveProfile} className="space-y-3 font-display">
+               <div className="text-center">
+                 <h3 className={`text-lg font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Edit Profile Info</h3>
+                 <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Manage Your Public Identity</p>
+@@ -1757,12 +1902,16 @@ export default function App() {
+                   <textarea
+                     rows={1}
+                     value={editBio}
+-                    onChange={(e) => setEditBio(e.target.value)}
++                    maxLength={MAX_BIO_LENGTH}
++                    onChange={(e) => setEditBio(e.target.value.slice(0, MAX_BIO_LENGTH))}
+                     placeholder="Type interesting details about yourself..."
+                     className={`w-full text-xs p-2 rounded-xl outline-none border transition resize-none ${
+                       theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 placeholder-slate-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500 placeholder-slate-500'
+                     }`}
+                   />
++                  <div className={`mt-2 text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
++                    {editBio.trim().length}/{MAX_BIO_LENGTH} characters
++                  </div>
+                 </div>
+ 
+                 <div>
+@@ -1770,16 +1919,26 @@ export default function App() {
+                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-200'}`}>City</label>
+                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
+                   </div>
+-                  <input
+-                    type="text"
+-                    value={editCity}
+-                    onChange={(e) => setEditCity(e.target.value)}
+-                    disabled={!isUserVIP}
+-                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+-                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+-                    }`}
+-                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+-                  />
++                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
++                    <input
++                      type="text"
++                      value={editCity}
++                      onChange={(e) => setEditCity(e.target.value)}
++                      disabled={!isUserVIP}
++                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
++                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
++                      }`}
++                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
++                    />
++                    {!isUserVIP && (
++                      <button
++                        type="button"
++                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
++                        className="absolute inset-0 rounded-xl bg-transparent"
++                        aria-label="Upgrade to VIP to edit city"
++                      />
++                    )}
++                  </div>
+                 </div>
+ 
+                 <div>
+@@ -1787,16 +1946,26 @@ export default function App() {
+                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>State</label>
+                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
+                   </div>
+-                  <input
+-                    type="text"
+-                    value={editState}
+-                    onChange={(e) => setEditState(e.target.value)}
+-                    disabled={!isUserVIP}
+-                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+-                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+-                    }`}
+-                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+-                  />
++                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
++                    <input
++                      type="text"
++                      value={editState}
++                      onChange={(e) => setEditState(e.target.value)}
++                      disabled={!isUserVIP}
++                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
++                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
++                      }`}
++                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
++                    />
++                    {!isUserVIP && (
++                      <button
++                        type="button"
++                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
++                        className="absolute inset-0 rounded-xl bg-transparent"
++                        aria-label="Upgrade to VIP to edit state"
++                      />
++                    )}
++                  </div>
+                 </div>
+ 
+                 <div className="sm:col-span-2">
+@@ -1804,16 +1973,26 @@ export default function App() {
+                     <label className={`block text-[9px] uppercase font-extrabold tracking-wider ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Country</label>
+                     {!isUserVIP && <span className="text-[8px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 py-0.5 rounded font-bold uppercase">VIP Only</span>}
+                   </div>
+-                  <input
+-                    type="text"
+-                    value={editCountry}
+-                    onChange={(e) => setEditCountry(e.target.value)}
+-                    disabled={!isUserVIP}
+-                    className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
+-                      !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
+-                    }`}
+-                    title={!isUserVIP ? "Only VIP members can edit their location" : ""}
+-                  />
++                  <div className="relative" onClick={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }} onTouchStart={(e) => { if (!isUserVIP) { e.preventDefault(); setShowOwnProfileModal(false); triggerVipPage(); } }}>
++                    <input
++                      type="text"
++                      value={editCountry}
++                      onChange={(e) => setEditCountry(e.target.value)}
++                      disabled={!isUserVIP}
++                      className={`w-full text-xs p-2 rounded-xl outline-none border transition ${
++                        !isUserVIP ? 'cursor-not-allowed opacity-70 ' + (theme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400') : (theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500' : 'bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500')
++                      }`}
++                      title={!isUserVIP ? "Only VIP members can edit their location" : ""}
++                    />
++                    {!isUserVIP && (
++                      <button
++                        type="button"
++                        onClick={() => { setShowOwnProfileModal(false); triggerVipPage(); }}
++                        className="absolute inset-0 rounded-xl bg-transparent"
++                        aria-label="Upgrade to VIP to edit country"
++                      />
++                    )}
++                  </div>
+                 </div>
+               </div>
+ 
+@@ -1862,6 +2041,7 @@ export default function App() {
+             </form>
+           </div>
+         </div>
++      </div>
+       )}
+ 
+       {!token || !me ? (
+@@ -2001,7 +2181,7 @@ export default function App() {
+                   </button>
+ 
+                   {showNotificationsDropdown && (
+-                    <div className={`fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-3 sm:w-80 max-h-[80vh] sm:max-h-[400px] overflow-y-auto rounded-2xl shadow-2xl border z-[100] animate-fade-in origin-top-right ${
++                    <div className={`fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-3 sm:w-80 max-h-[80dvh] sm:max-h-[400px] overflow-y-auto rounded-2xl shadow-2xl border z-[100] animate-fade-in origin-top-right ${
+                       theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+                     }`}>
+                       <div className={`p-4 border-b font-bold tracking-tight ${theme === 'light' ? 'border-slate-100 text-slate-800' : 'border-slate-800 text-white'}`}>
+@@ -2105,7 +2285,7 @@ export default function App() {
+           <main className="flex-1 min-h-0 py-0 sm:py-6 relative z-10 flex flex-col justify-center items-center overflow-hidden w-full max-w-full">
+             <div className="absolute top-0 right-0 w-[500px] h-[400px] bg-gradient-to-tr from-violet-600/5 via-indigo-600/3 to-transparent blur-[120px] pointer-events-none rounded-full"></div>
+             
+-            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden">
++            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden pb-20 sm:pb-0">
+               
+               <div className={`w-full max-w-full flex flex-col flex-1 min-h-0 sm:rounded-[2rem] overflow-hidden shadow-2xl transition duration-300 sm:border ${
+                   theme === 'light'
+@@ -2163,74 +2343,6 @@ export default function App() {
+                         />
+                       )}
+ 
+-                      {(screen === 'lobby' || screen === 'plans') && (
+-                        <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden ${isChatActiveMobile ? 'hidden md:flex' : ''} ${
+-                          theme === 'light' ? 'bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/50 backdrop-blur-md border-violet-900/30'
+-                        }`}>
+-                          <button
+-                            onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+-                              screen === 'lobby' && sidebarTab === 'people'
+-                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+-                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+-                            }`}
+-                          >
+-                            <div className="relative shrink-0">
+-                              <Users className="w-5 h-5" />
+-                              {globalStats && (
+-                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
+-                                  {globalStats.totalOnline}
+-                                </span>
+-                              )}
+-                            </div>
+-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
+-                          </button>
+-
+-                          <button
+-                            onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+-                              screen === 'lobby' && sidebarTab === 'chat'
+-                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+-                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+-                            }`}
+-                          >
+-                            <div className="relative shrink-0">
+-                              <MessageSquare className="w-5 h-5" />
+-                              {unreadChatCount > 0 && (
+-                                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
+-                                  {unreadChatCount}
+-                                </span>
+-                              )}
+-                            </div>
+-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
+-                          </button>
+-
+-                          <button
+-                            onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
+-                              screen === 'lobby' && sidebarTab === 'lounge'
+-                                ? 'bg-violet-600/20 text-violet-400 shadow-inner'
+-                                : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+-                            }`}
+-                          >
+-                            <Smile className="w-5 h-5 shrink-0" />
+-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
+-                          </button>
+-
+-                          <button
+-                            onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+-                            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
+-                              screen === 'plans'
+-                                ? 'bg-amber-500/10 text-amber-500 shadow-inner'
+-                                : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
+-                            }`}
+-                          >
+-                            <Sparkles className="w-5 h-5 shrink-0" />
+-                            <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
+-                          </button>
+-                        </nav>
+-                      )}
+-        
+                       {screen === 'admin' && isUserAdmin && (
+                         <AdminPanel
+                           onBack={() => { setScreen('lobby'); setSidebarTab('people'); }}
+@@ -2246,42 +2358,118 @@ export default function App() {
+             </div>
+           </main>
+ 
+-          {/* Footer - Only show before login on public pages */}
+-        </div>
+-      )}
+-      
+-      </div>
++          {screen === 'lobby' && !isChatActiveMobile && (
++            <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
++              theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
++            }`}>
++              <button
++                onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
++                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
++                  screen === 'lobby' && sidebarTab === 'people'
++                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
++                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
++                }`}>
++                <div className="relative shrink-0">
++                  <Users className="w-5 h-5" />
++                  {globalStats && (
++                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-emerald-600">
++                      {globalStats.totalOnline}
++                    </span>
++                  )}
++                </div>
++                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">People</span>
++              </button>
+ 
+-      {showExitConfirm && (
+-        <div className={`fixed inset-0 backdrop-blur-md z-[200] overflow-y-auto touch-pan-y p-4 text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
+-          <div className={`mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90vh] space-y-6 shadow-2xl relative overflow-y-auto min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+-            <div className="text-4xl mb-2">🚪</div>
+-            <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
+-              Are you sure you want to quit?
+-            </h3>
+-            <p className={`text-sm mb-6 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
+-              You are about to exit the application.
+-            </p>
+-            <div className="flex gap-3 justify-center select-none">
+               <button
+-                onClick={() => setShowExitConfirm(false)}
+-                className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition ${theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
+-              >
+-                No, Stay
++                onClick={() => { setScreen('lobby'); setSidebarTab('chat'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
++                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
++                  screen === 'lobby' && sidebarTab === 'chat'
++                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
++                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
++                }`}>
++                <div className="relative shrink-0">
++                  <MessageSquare className="w-5 h-5" />
++                  {unreadChatCount > 0 && (
++                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-0.5 shadow-sm border border-rose-600">
++                      {unreadChatCount}
++                    </span>
++                  )}
++                </div>
++                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Chat</span>
+               </button>
++
+               <button
+-                onClick={() => {
+-                  setShowExitConfirm(false);
+-                  handleLogout();
+-                }}
+-                className="flex-1 py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition"
+-              >
+-                Yes, Quit
++                onClick={() => { setScreen('lobby'); setSidebarTab('lounge'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
++                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display text-center ${
++                  screen === 'lobby' && sidebarTab === 'lounge'
++                    ? 'bg-violet-600/20 text-violet-400 shadow-inner'
++                    : theme === 'light' ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
++                }`}>
++                <Smile className="w-5 h-5 shrink-0" />
++                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Matching Room</span>
++              </button>
++
++              <button
++                onClick={() => { setVipScrollToPlans(false); setScreen('plans'); setSidebarTab('vip'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
++                className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl transition cursor-pointer font-display ${
++                  screen === 'plans'
++                    ? 'bg-amber-500/10 text-amber-500 shadow-inner'
++                    : theme === 'light' ? 'text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:bg-slate-800 hover:text-amber-400'
++                }`}>
++                <Sparkles className="w-5 h-5 shrink-0" />
++                <span className="font-bold text-[8.5px] sm:text-[11px] lg:text-[12px] tracking-wide text-center leading-tight w-full truncate px-0.5">Upgrade VIP</span>
+               </button>
++            </nav>
++          )}
++
++          {/* Footer - Only show before login on public pages */}
++        </div>
++      )}
++
++      {showExitConfirm && (
++        <div className={`modal-overlay text-center animate-fade-in ${theme === 'light' ? 'bg-slate-900/40 text-slate-900' : 'bg-slate-950/80 text-slate-100'}`}>
++          <div className={`modal-card mx-auto p-8 border rounded-3xl max-w-sm w-full max-h-[90dvh] space-y-6 shadow-2xl relative min-h-0 ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
++            <button
++              type="button"
++              onClick={() => setShowExitConfirm(false)}
++              className={`modal-close-button text-lg p-1 ${theme === 'light' ? 'text-slate-700 hover:text-slate-900' : 'text-slate-200 hover:text-slate-300'}`}
++              aria-label="Close exit confirmation"
++            >
++              ✕
++            </button>
++            <div className="modal-card-body">
++              <div className="text-4xl mb-2">🚪</div>
++              <h3 className={`text-xl font-bold font-display tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-slate-100'}`}>
++                Are you sure you want to quit?
++              </h3>
++              <p className={`text-sm mb-6 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
++                You are about to exit the application.
++              </p>
++            </div>
++            <div className="modal-card-footer">
++              <div className="flex gap-3 justify-center select-none">
++                <button
++                  onClick={() => setShowExitConfirm(false)}
++                  className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition ${theme === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
++                >
++                  No, Stay
++                </button>
++                <button
++                  onClick={() => {
++                    setShowExitConfirm(false);
++                    handleLogout();
++                  }}
++                  className="flex-1 py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition"
++                >
++                  Yes, Quit
++                </button>
++              </div>
+             </div>
+           </div>
+         </div>
+       )}
++
+     </div>
++  </div>
+   );
+ }
+\ No newline at end of file

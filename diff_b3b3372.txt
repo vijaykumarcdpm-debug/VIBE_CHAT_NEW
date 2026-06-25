@@ -1,0 +1,145 @@
+commit b3b3372030eb2ed176acaaf18432027302a482d3
+Author: vijaykumarcdpm-debug <vijaykumarcdpm@gmail.com>
+Date:   Mon Jun 22 19:46:02 2026 +0530
+
+    Restore bottom navigation visibility during active chat
+
+diff --git a/src/App.tsx b/src/App.tsx
+index e600ac7..8521285 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1610,7 +1610,7 @@ export default function App() {
+ 
+       {activeCall && (
+         <div className="modal-overlay bg-[#070B16] z-50">
+-          <div className="modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
++          <div className="modal-card full-screen-call-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
+             <AudioVideoCall
+               ws={ws}
+               userId={me?.id || ''}
+@@ -2358,7 +2358,7 @@ export default function App() {
+             </div>
+           </main>
+ 
+-          {(screen === 'lobby' || screen === 'plans') && (
++          {screen === 'lobby' && !isChatActiveMobile && (
+             <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
+               theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
+             }`}>
+diff --git a/src/components/AudioVideoCall.tsx b/src/components/AudioVideoCall.tsx
+index 7cc80d2..f00cf54 100644
+--- a/src/components/AudioVideoCall.tsx
++++ b/src/components/AudioVideoCall.tsx
+@@ -439,7 +439,7 @@ export default function AudioVideoCall({
+   return (
+     <div
+       ref={containerRef}
+-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition pb-20 sm:pb-0 ${
++      className={`relative flex flex-col items-center justify-center w-full h-full min-h-0 md:min-h-[500px] max-h-full bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition sm:pb-0 ${
+         isFullscreen ? 'h-screen rounded-none border-none' : ''
+       }`}
+     >
+@@ -579,7 +579,10 @@ export default function AudioVideoCall({
+       )}
+ 
+       {/* INTERACTIVE CONTROLS BAR */}
+-      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl z-20 max-w-[calc(100vw-1.5rem)] sm:max-w-none w-fit">
++      <div
++        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-start sm:justify-center gap-1.5 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl z-20 w-full max-w-[calc(100vw-1.25rem)] overflow-x-auto call-controls-bar"
++        style={{ bottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
++      >
+         {/* Toggle Audio Mute */}
+         <button
+           onClick={toggleMute}
+diff --git a/src/components/VipPlansPage.tsx b/src/components/VipPlansPage.tsx
+index 39b31ba..84bfafb 100644
+--- a/src/components/VipPlansPage.tsx
++++ b/src/components/VipPlansPage.tsx
+@@ -340,8 +340,8 @@ export default function VipPlansPage({
+ 
+       {selectedPlan && (
+         <div className={`modal-overlay z-[100] backdrop-blur-md animate-fade-in ${theme === 'light' ? 'bg-slate-900/60' : 'bg-black/80'}`}>
+-          <div className={`mx-auto w-full max-w-4xl modal-card rounded-3xl shadow-2xl relative flex flex-col max-h-[calc(100dvh-4rem)] overflow-hidden ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
+-            <div className="modal-card-body flex-1 min-h-0 overflow-y-auto p-6 sm:p-8" style={{ maxHeight: 'calc(100dvh - 14rem)' }}>
++          <div className={`mx-auto w-full max-w-4xl modal-card vip-payment-modal-card rounded-3xl shadow-2xl relative flex flex-col h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] overflow-hidden ${theme === "light" ? "bg-white border border-slate-200" : "bg-slate-950 border border-slate-800"}`}>
++            <div className="modal-card-body flex-1 min-h-0 overflow-y-auto p-6 sm:p-8">
+               {/* Modal Header */}
+               <div className="flex justify-between items-center mb-6">
+                 <h2 className={`text-2xl font-black font-display tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+@@ -450,19 +450,17 @@ export default function VipPlansPage({
+                 </div>
+               </div>
+             </div>
+-            <div className="modal-card-footer px-6 sm:px-8 pb-6 flex-shrink-0 bg-transparent">
+-              <div className="sticky bottom-0 left-0 right-0 pt-4 bg-transparent">
+-                <button
+-                  onClick={handleSubmit}
+-                  disabled={isSubmitting || !screenshot}
+-                  className="w-full py-4 bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:dark:from-slate-800 disabled:dark:to-slate-800 disabled:dark:text-slate-600 hover:from-violet-500 hover:to-fuchsia-400 text-white rounded-2xl font-black font-display tracking-widest uppercase shadow-xl shadow-violet-500/20 disabled:shadow-none transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+-                >
+-                  {isSubmitting ? 'Verifying Upload...' : `Submit Payment of ₹${selectedPlan.price}`}
+-                </button>
+-                <p className={`text-xs font-bold text-center mt-4 flex items-center justify-center gap-1.5 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
+-                  <Shield className="w-4 h-4" /> Secure 256-bit UPI Gateway Protection
+-                </p>
+-              </div>
++            <div className="modal-card-footer sticky bottom-0 left-0 right-0 z-20 px-6 sm:px-8 pb-[max(env(safe-area-inset-bottom),1rem)] pt-4 bg-slate-950/95 backdrop-blur-md border-t border-slate-200/10 sm:border-slate-200/20">
++              <button
++                onClick={handleSubmit}
++                disabled={isSubmitting || !screenshot}
++                className="w-full py-4 bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:dark:from-slate-800 disabled:dark:to-slate-800 disabled:dark:text-slate-600 hover:from-violet-500 hover:to-fuchsia-400 text-white rounded-2xl font-black font-display tracking-widest uppercase shadow-xl shadow-violet-500/20 disabled:shadow-none transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
++              >
++                {isSubmitting ? 'Verifying Upload...' : `Submit Payment of ₹${selectedPlan.price}`}
++              </button>
++              <p className={`text-xs font-bold text-center mt-4 flex items-center justify-center gap-1.5 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
++                <Shield className="w-4 h-4" /> Secure 256-bit UPI Gateway Protection
++              </p>
+             </div>
+           </div>
+         </div>
+diff --git a/src/index.css b/src/index.css
+index 1fcf5d5..c5ff42f 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -174,6 +174,14 @@
+     min-height: 0 !important;
+   }
+ 
++  .modal-overlay > .modal-card.full-screen-call-card {
++    height: 100% !important;
++    max-height: 100% !important;
++    min-height: 100% !important;
++    margin: 0 !important;
++    padding: 0 !important;
++  }
++
+   .modal-overlay .modal-card-body {
+     overflow-y: auto !important;
+     overflow-x: hidden !important;
+@@ -202,5 +210,26 @@
+   .modal-card .modal-close-button:hover {
+     opacity: 0.95 !important;
+   }
++
++  .vip-payment-modal-card {
++    height: calc(100dvh - 4rem) !important;
++    max-height: calc(100dvh - 4rem) !important;
++    min-height: 0 !important;
++    overflow: hidden !important;
++  }
++
++  .call-controls-bar {
++    flex-wrap: nowrap !important;
++    white-space: nowrap !important;
++    -webkit-overflow-scrolling: touch !important;
++    scrollbar-width: none !important;
++    -ms-overflow-style: none !important;
++  }
++
++  .call-controls-bar::-webkit-scrollbar {
++    width: 0 !important;
++    height: 0 !important;
++    display: none !important;
++  }
+ }
+ 

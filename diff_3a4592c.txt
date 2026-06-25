@@ -1,0 +1,263 @@
+commit 3a4592c92c553b03fb393e59670b62ca4cc7f48d
+Author: vijaykumarcdpm-debug <vijaykumarcdpm@gmail.com>
+Date:   Mon Jun 22 03:09:17 2026 +0530
+
+    Add full-screen preview for user profile photos
+
+diff --git a/src/App.tsx b/src/App.tsx
+index cadc4bb..10d1302 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1241,7 +1241,7 @@ export default function App() {
+                 peerName: prevOrig.targetName,
+                 peerPic: prevOrig.targetPic,
+                 isCaller: true,
+-                type: prevOrig.type
++                type: data.type || prevOrig.type
+               });
+               showToast('Stranger accepted call. Connecting lines...');
+             } else if (!data.accepted) {
+@@ -2285,7 +2285,7 @@ export default function App() {
+           <main className="flex-1 min-h-0 py-0 sm:py-6 relative z-10 flex flex-col justify-center items-center overflow-hidden w-full max-w-full">
+             <div className="absolute top-0 right-0 w-[500px] h-[400px] bg-gradient-to-tr from-violet-600/5 via-indigo-600/3 to-transparent blur-[120px] pointer-events-none rounded-full"></div>
+             
+-            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden">
++            <div className="max-w-4xl mx-auto w-full max-w-[100vw] px-0 sm:px-6 flex flex-col flex-1 min-h-0 max-h-[850px] overflow-hidden pb-20 sm:pb-0">
+               
+               <div className={`w-full max-w-full flex flex-col flex-1 min-h-0 sm:rounded-[2rem] overflow-hidden shadow-2xl transition duration-300 sm:border ${
+                   theme === 'light'
+@@ -2344,8 +2344,8 @@ export default function App() {
+                       )}
+ 
+                       {(screen === 'lobby' || screen === 'plans') && (
+-                        <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden ${isChatActiveMobile ? 'hidden md:flex' : ''} ${
+-                          theme === 'light' ? 'bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/50 backdrop-blur-md border-violet-900/30'
++                        <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden fixed sm:static bottom-0 left-0 right-0 z-40 ${
++                          theme === 'light' ? 'bg-white/95 sm:bg-white/50 backdrop-blur-md border-slate-200' : 'bg-slate-900/95 sm:bg-slate-900/50 backdrop-blur-md border-violet-900/30'
+                         }`}>
+                           <button
+                             onClick={() => { setScreen('lobby'); setSidebarTab('people'); setShowNotificationsDropdown(false); setShowOwnProfileModal(false); }}
+diff --git a/src/components/AudioVideoCall.tsx b/src/components/AudioVideoCall.tsx
+index de2af88..7cc80d2 100644
+--- a/src/components/AudioVideoCall.tsx
++++ b/src/components/AudioVideoCall.tsx
+@@ -69,6 +69,7 @@ export default function AudioVideoCall({
+   const pcRef = useRef<RTCPeerConnection | null>(null);
+   const signalQueue = useRef<any[]>([]);
+   const containerRef = useRef<HTMLDivElement>(null);
++  const remoteStreamRef = useRef<MediaStream | null>(null);
+   const correctionRefs = useRef<{
+     canvas?: HTMLCanvasElement;
+     video?: HTMLVideoElement;
+@@ -81,11 +82,14 @@ export default function AudioVideoCall({
+ 
+   const processSignal = async (signal: any, pc: RTCPeerConnection) => {
+     try {
++      console.debug('[AudioVideoCall] processSignal', signal?.sdp?.type ? signal.sdp.type : 'candidate', { peerId });
+       if (signal.sdp) {
+         await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
++        console.debug('[AudioVideoCall] remote description set', pc.remoteDescription?.type);
+         if (pc.remoteDescription?.type === 'offer') {
+           const answer = await pc.createAnswer();
+           await pc.setLocalDescription(answer);
++          console.debug('[AudioVideoCall] created local answer', { peerId });
+           if (ws) {
+             ws.send(JSON.stringify({
+               event: 'webrtc:signal',
+@@ -93,11 +97,25 @@ export default function AudioVideoCall({
+             }));
+           }
+         }
++
++        // Flush any queued ICE candidates once remote description is available.
++        while (signalQueue.current.length > 0) {
++          const queuedSignal = signalQueue.current.shift();
++          if (queuedSignal) {
++            await processSignal(queuedSignal, pc);
++          }
++        }
+       } else if (signal.candidate) {
++        if (!pc.remoteDescription || !pc.remoteDescription.type) {
++          signalQueue.current.push(signal);
++          console.debug('[AudioVideoCall] queued ICE candidate until remote description is ready', { peerId });
++          return;
++        }
++        console.debug('[AudioVideoCall] adding remote candidate', { peerId });
+         await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+       }
+     } catch (err) {
+-      console.warn('Error processing signal:', err);
++      console.warn('Error processing signal:', err, { peerId, signal });
+     }
+   };
+ 
+@@ -180,16 +198,20 @@ export default function AudioVideoCall({
+ 
+     const handleSignaling = (e: MessageEvent) => {
+       try {
+-        const { event, data } = JSON.parse(e.data);
++        const parsed = JSON.parse(e.data);
++        const { event, data } = parsed;
+         if (event === 'webrtc:signal' && data.senderId === peerId) {
++          console.debug('[AudioVideoCall] received webrtc:signal', { peerId, signal: data.signal });
+           const { signal } = data;
+           
+           if (pcRef.current) {
+             processSignal(signal, pcRef.current);
+           } else {
+             signalQueue.current.push(signal);
++            console.debug('[AudioVideoCall] queued signal until PeerConnection is ready', { peerId });
+           }
+         } else if (event === 'call:hangup' && data.senderId === peerId) {
++          console.debug('[AudioVideoCall] received hangup from peer', { peerId });
+           setCallStatus('Finished');
+           setTimeout(() => {
+             onHangup();
+@@ -286,14 +308,27 @@ export default function AudioVideoCall({
+     });
+ 
+     pc.ontrack = (event) => {
+-      const [remoteMediaStream] = event.streams;
+-      setRemoteStream(remoteMediaStream);
++      const streamFromEvent = event.streams && event.streams[0];
++
++      if (streamFromEvent) {
++        remoteStreamRef.current = streamFromEvent;
++      } else {
++        if (!remoteStreamRef.current) {
++          remoteStreamRef.current = new MediaStream();
++        }
++        remoteStreamRef.current.addTrack(event.track);
++      }
++
++      const currentStream = remoteStreamRef.current;
++      setRemoteStream(currentStream);
+       setCallStatus('Connected');
+ 
+       if (callType === 'video' && remoteVideoRef.current) {
+-        remoteVideoRef.current.srcObject = remoteMediaStream;
++        remoteVideoRef.current.srcObject = currentStream;
++        remoteVideoRef.current.play().catch(() => {});
+       } else if (callType === 'audio' && remoteAudioRef.current) {
+-        remoteAudioRef.current.srcObject = remoteMediaStream;
++        remoteAudioRef.current.srcObject = currentStream;
++        remoteAudioRef.current.play().catch(() => {});
+       }
+     };
+ 
+@@ -404,7 +439,7 @@ export default function AudioVideoCall({
+   return (
+     <div
+       ref={containerRef}
+-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100dvh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
++      className={`relative flex flex-col items-center justify-center w-full h-full min-h-screen md:min-h-[500px] max-h-[100vh] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition pb-20 sm:pb-0 ${
+         isFullscreen ? 'h-screen rounded-none border-none' : ''
+       }`}
+     >
+@@ -544,31 +579,31 @@ export default function AudioVideoCall({
+       )}
+ 
+       {/* INTERACTIVE CONTROLS BAR */}
+-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 px-2 sm:px-4 py-2.5 sm:py-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl flex-nowrap overflow-x-auto w-full max-w-[calc(100vw-1rem)] z-20">
++      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl z-20 max-w-[calc(100vw-1.5rem)] sm:max-w-none w-fit">
+         {/* Toggle Audio Mute */}
+         <button
+           onClick={toggleMute}
+           title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+-          className={`p-3 sm:p-3.5 rounded-full sm:rounded-xl border transition duration-200 cursor-pointer shrink-0 ${
++          className={`p-2.5 sm:p-3.5 rounded-full sm:rounded-xl border transition duration-200 cursor-pointer shrink-0 ${
+             isMuted
+               ? 'bg-rose-500/20 border-rose-500/30 text-rose-400 hover:bg-rose-500/30'
+               : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+           }`}
+         >
+-          {isMuted ? <MicOff className="w-5 h-5 sm:w-5 sm:h-5" /> : <Mic className="w-5 h-5 sm:w-5 sm:h-5" />}
++          {isMuted ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
+         </button>
+ 
+         {/* Toggle Speaker */}
+         <button
+           onClick={toggleSpeaker}
+           title={isSpeakerOn ? 'Mute speaker' : 'Unmute speaker'}
+-          className={`p-3 sm:p-3.5 rounded-full sm:rounded-xl border transition duration-200 cursor-pointer shrink-0 ${
++          className={`p-2.5 sm:p-3.5 rounded-full sm:rounded-xl border transition duration-200 cursor-pointer shrink-0 ${
+             !isSpeakerOn
+               ? 'bg-rose-500/20 border-rose-500/30 text-rose-400 hover:bg-rose-500/30'
+               : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+           }`}
+         >
+-          {!isSpeakerOn ? <VolumeX className="w-5 h-5 sm:w-5 sm:h-5" /> : <Volume2 className="w-5 h-5 sm:w-5 sm:h-5" />}
++          {!isSpeakerOn ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />}
+         </button>
+ 
+         {/* Toggle Video Feed (For Video calls only) */}
+@@ -576,13 +611,13 @@ export default function AudioVideoCall({
+           <button
+             onClick={toggleVideo}
+             title={isVideoOff ? 'Turn camera on' : 'Turn camera off'}
+-            className={`p-3 sm:p-3.5 rounded-full sm:rounded-xl border transition duration-200 cursor-pointer shrink-0 ${
++            className={`p-2.5 sm:p-3.5 rounded-full sm:rounded-xl border transition duration-200 cursor-pointer shrink-0 ${
+               isVideoOff
+                 ? 'bg-rose-500/20 border-rose-500/30 text-rose-400 hover:bg-rose-500/30'
+                 : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+             }`}
+           >
+-            {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-5 sm:h-5" /> : <Video className="w-5 h-5 sm:w-5 sm:h-5" />}
++            {isVideoOff ? <VideoOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Video className="w-4 h-4 sm:w-5 sm:h-5" />}
+           </button>
+         )}
+ 
+@@ -591,9 +626,9 @@ export default function AudioVideoCall({
+           <button
+             onClick={switchCamera}
+             title="Switch Camera (Front/Back)"
+-            className="p-3 sm:p-3.5 bg-slate-900 hover:bg-slate-800 border fill-current border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0"
++            className="p-2.5 sm:p-3.5 bg-slate-900 hover:bg-slate-800 border fill-current border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0"
+           >
+-            <span className="text-xs font-semibold px-0.5" style={{ display: 'flex' }}>Flip</span>
++            <span className="text-[10px] sm:text-xs font-semibold px-0.5" style={{ display: 'flex' }}>Flip</span>
+           </button>
+         )}
+ 
+@@ -601,9 +636,9 @@ export default function AudioVideoCall({
+         <button
+           onClick={hangUpCall}
+           title="Hang Up Connection"
+-          className="p-3 sm:p-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-full sm:rounded-xl shadow-lg shadow-rose-600/30 hover:scale-105 duration-200 cursor-pointer shrink-0"
++          className="p-2.5 sm:p-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-full sm:rounded-xl shadow-lg shadow-rose-600/30 hover:scale-105 duration-200 cursor-pointer shrink-0"
+         >
+-          <PhoneOff className="w-5 h-5 sm:w-5 sm:h-5" />
++          <PhoneOff className="w-4 h-4 sm:w-5 sm:h-5" />
+         </button>
+ 
+         {/* Chat button */}
+@@ -611,7 +646,7 @@ export default function AudioVideoCall({
+           <button
+             onClick={onOpenChat}
+             title="Open Chat"
+-            className="p-3 sm:p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0 text-xs font-bold"
++            className="p-2.5 sm:p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0 text-[10px] sm:text-xs font-bold"
+           >
+             💬
+           </button>
+@@ -622,7 +657,7 @@ export default function AudioVideoCall({
+           <button
+             onClick={onNextMatch}
+             title="Find Next Match"
+-            className="p-3 sm:p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0 text-xs font-bold"
++            className="p-2.5 sm:p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0 text-[10px] sm:text-xs font-bold"
+           >
+             Next
+           </button>
+@@ -632,9 +667,9 @@ export default function AudioVideoCall({
+         <button
+           onClick={handleFullscreen}
+           title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+-          className="p-3 sm:p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0 hidden sm:block"
++          className="p-2.5 sm:p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer shrink-0 hidden sm:block"
+         >
+-          {isFullscreen ? <Minimize className="w-5 h-5 sm:w-5 sm:h-5" /> : <Maximize className="w-5 h-5 sm:w-5 sm:h-5" />}
++          {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />}
+         </button>
+       </div>
+     </div>
