@@ -550,7 +550,9 @@ export default function App() {
           return;
         }
 
-        if (screenRef.current !== 'lobby' || sidebarTabRef.current !== 'people') {
+        const isPeopleLobbyView = screenRef.current === 'lobby' && sidebarTabRef.current === 'people';
+        if (!isPeopleLobbyView) {
+          setShowExitConfirm(false);
           setScreen('lobby');
           setSidebarTab('people');
           restoreAppGuard();
@@ -749,15 +751,12 @@ export default function App() {
           return;
         }
 
-        if (screenRef.current !== 'lobby') {
-          setScreen('lobby');
-          setSidebarTab('people');
-          markAndroidBackHandled(evt);
-          restoreAppGuard();
-          return;
-        }
-
-        if (sidebarTabRef.current !== 'people') {
+        const isPeopleLobbyView = screenRef.current === 'lobby' && sidebarTabRef.current === 'people';
+        if (!isPeopleLobbyView) {
+          setShowExitConfirm(false);
+          if (screenRef.current !== 'lobby') {
+            setScreen('lobby');
+          }
           setSidebarTab('people');
           markAndroidBackHandled(evt);
           restoreAppGuard();
@@ -1611,8 +1610,8 @@ export default function App() {
       )}
 
       {activeCall && (
-        <div className="modal-overlay bg-[#070B16] z-50">
-          <div className="modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
+        <div className="modal-overlay call-modal-overlay bg-[#070B16] z-50">
+          <div className="modal-card call-modal-card mx-auto w-full max-w-4xl h-full max-h-full md:h-auto md:max-h-[calc(100dvh-4rem)] overflow-hidden min-h-0">
             <AudioVideoCall
               ws={ws}
               userId={me?.id || ''}
@@ -2307,52 +2306,56 @@ export default function App() {
                 ) : (
                   <>
                     <div className="flex-1 min-h-0 flex flex-col w-full">
-                      {screen === 'lobby' && (
-                        <ChatInterface
-                          ws={ws}
-                          me={me}
-                          token={token}
-                          theme={theme}
-                          wallpaper={wallpaper}
-                          wallpaperOpacity={wallpaperOpacity}
-                          handleWallpaperChange={handleWallpaperChange}
-                          handleWallpaperOpacityChange={handleWallpaperOpacityChange}
-                          failedWallpapers={failedWallpapers}
-                          setFailedWallpapers={setFailedWallpapers}
-                          PRESET_WALLPAPERS={PRESET_WALLPAPERS}
-                          handleCustomWallpaperUpload={handleCustomWallpaperUpload}
-                          onInitiateCall={handleInitiateCall}
-                          onTriggerVipPage={triggerVipPage}
-                          sidebarTab={sidebarTab}
-                          setSidebarTab={setSidebarTab}
-                          notifications={notifications}
-                          setNotifications={setNotifications}
-                          onEditProfile={() => setShowOwnProfileModal(true)}
-                          setUnreadMessageCount={setUnreadChatCount}
-                          onChatActiveChange={setIsChatActiveMobile}
-                          isAppOverlayOpen={
-                            showOwnProfileModal ||
-                            showNotificationsDropdown ||
-                            showThemeModal ||
-                            showExitConfirm ||
-                            Boolean(incomingCall) ||
-                            Boolean(outgoingCall) ||
-                            Boolean(activeCall)
-                          }
-                        />
-                      )}
-        
-                      {screen === 'plans' && (
-                        <VipPlansPage
-                          onBack={() => { setScreen('lobby'); setSidebarTab('people'); }}
-                          onSubmitPayment={handleVipPaymentSubmit}
-                          plans={plans}
-                          qrCodeUrl={qrCodeUrl}
-                          paymentPending={paymentPending}
-                          theme={theme}
-                          autoScrollToPlans={vipScrollToPlans}
-                        />
-                      )}
+                      <div className="flex-1 min-h-0 relative">
+                        <div className={screen === 'plans' ? 'absolute inset-0 opacity-0 pointer-events-none' : 'h-full'}>
+                          <ChatInterface
+                            ws={ws}
+                            me={me}
+                            token={token}
+                            theme={theme}
+                            wallpaper={wallpaper}
+                            wallpaperOpacity={wallpaperOpacity}
+                            handleWallpaperChange={handleWallpaperChange}
+                            handleWallpaperOpacityChange={handleWallpaperOpacityChange}
+                            failedWallpapers={failedWallpapers}
+                            setFailedWallpapers={setFailedWallpapers}
+                            PRESET_WALLPAPERS={PRESET_WALLPAPERS}
+                            handleCustomWallpaperUpload={handleCustomWallpaperUpload}
+                            onInitiateCall={handleInitiateCall}
+                            onTriggerVipPage={triggerVipPage}
+                            sidebarTab={sidebarTab}
+                            setSidebarTab={setSidebarTab}
+                            notifications={notifications}
+                            setNotifications={setNotifications}
+                            onEditProfile={() => setShowOwnProfileModal(true)}
+                            setUnreadMessageCount={setUnreadChatCount}
+                            onChatActiveChange={setIsChatActiveMobile}
+                            isAppOverlayOpen={
+                              showOwnProfileModal ||
+                              showNotificationsDropdown ||
+                              showThemeModal ||
+                              showExitConfirm ||
+                              Boolean(incomingCall) ||
+                              Boolean(outgoingCall) ||
+                              Boolean(activeCall)
+                            }
+                          />
+                        </div>
+
+                        {screen === 'plans' && (
+                          <div className="absolute inset-0 overflow-y-auto">
+                            <VipPlansPage
+                              onBack={() => { setScreen('lobby'); setSidebarTab('people'); }}
+                              onSubmitPayment={handleVipPaymentSubmit}
+                              plans={plans}
+                              qrCodeUrl={qrCodeUrl}
+                              paymentPending={paymentPending}
+                              theme={theme}
+                              autoScrollToPlans={vipScrollToPlans}
+                            />
+                          </div>
+                        )}
+                      </div>
 
                       {(screen === 'lobby' || screen === 'plans') && (
                         <nav className={`shrink-0 w-full max-w-full flex justify-between gap-1 p-1.5 sm:p-3 border-t transition duration-300 overflow-hidden ${isChatActiveMobile ? 'hidden md:flex' : ''} ${

@@ -105,6 +105,19 @@
   }
 }
 
+@media (min-width: 769px) {
+  .call-modal-overlay {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .call-modal-overlay > .call-modal-card {
+    overflow: hidden;
+    overflow-x: clip;
+    box-shadow: none;
+  }
+}
+
 /* Hide overlay scrollbar (keep scrolling) and style modal body scrollbar thinly */
 .modal-overlay {
   -ms-overflow-style: none; /* IE 10+ */

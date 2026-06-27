@@ -1607,9 +1607,14 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
   broadcastToAll('stats:update', getLiveStats());
   broadcastPresence(userId, true);
 
-  ws.on('message', (messageRaw: string) => {
+  ws.on('message', (messageRaw: Buffer | ArrayBuffer | Buffer[] | string) => {
     try {
-      const { event, data } = JSON.parse(messageRaw);
+      const messageText = typeof messageRaw === 'string'
+        ? messageRaw
+        : messageRaw instanceof Buffer
+          ? messageRaw.toString('utf8')
+          : Buffer.from(messageRaw as ArrayBuffer).toString('utf8');
+      const { event, data } = JSON.parse(messageText);
       
       // Keep-alive or Ping matching
       if (event === 'ping') {

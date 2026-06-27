@@ -39,6 +39,7 @@ export default function AudioVideoCall({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [callStatus, setCallStatus] = useState<string>('Connecting stream...');
+  const [isCallConnected, setIsCallConnected] = useState<boolean>(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const localPreviewTransform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
@@ -172,14 +173,16 @@ export default function AudioVideoCall({
   // Hide 'Connecting' status as soon as a remote stream is present
   // or when the peer connection reaches connected/completed state.
   useEffect(() => {
-    if (remoteStream) {
+    const pc = pcRef.current;
+    const connectedNow = Boolean(remoteStream) || Boolean(pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected'));
+
+    if (connectedNow) {
+      setIsCallConnected(true);
       setCallStatus('Connected');
       return;
     }
-    const pc = pcRef.current;
-    if (pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'completed')) {
-      setCallStatus('Connected');
-    }
+
+    setIsCallConnected(false);
   }, [remoteStream]);
 
   const setupWebRTC = (stream: MediaStream) => {
@@ -200,6 +203,7 @@ export default function AudioVideoCall({
     pc.ontrack = (event) => {
       const [remoteMediaStream] = event.streams;
       setRemoteStream(remoteMediaStream);
+      setIsCallConnected(true);
       setCallStatus('Connected');
 
       if (callType === 'video' && remoteVideoRef.current) {
@@ -211,16 +215,20 @@ export default function AudioVideoCall({
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        setIsCallConnected(false);
         setCallStatus('Connection Lost');
       } else if (pc.connectionState === 'connected') {
+        setIsCallConnected(true);
         setCallStatus('Connected');
       }
     };
 
     pc.oniceconnectionstatechange = () => {
       if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        setIsCallConnected(false);
         setCallStatus('Connection Lost');
-      } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      } else if (pc.iceConnectionState === 'connected') {
+        setIsCallConnected(true);
         setCallStatus('Connected');
       }
     };
@@ -313,6 +321,7 @@ export default function AudioVideoCall({
     }
     setRemoteStream(null);
     setLocalStream(null);
+    setIsCallConnected(false);
   };
 
   const handleCancelReconnect = () => {
@@ -339,7 +348,7 @@ export default function AudioVideoCall({
   return (
     <div
       ref={containerRef}
-      className={`relative flex flex-col items-center justify-center w-full min-h-[500px] h-[100dvh] md:h-[620px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 transition ${
+      className={`relative flex flex-col items-center justify-center w-full min-h-[500px] h-[100dvh] md:h-[620px] bg-slate-950 rounded-2xl overflow-hidden overflow-x-clip border border-slate-800 transition ${
         isFullscreen ? 'h-screen rounded-none border-none' : ''
       }`}
     >
@@ -388,7 +397,7 @@ export default function AudioVideoCall({
       )}
 
       {/* Connection Indicator Overlay */}
-      {callStatus !== 'Connected' && callStatus !== 'Finished' && !errorMsg && (
+      {!isCallConnected && callStatus !== 'Finished' && !errorMsg && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center justify-center p-4 bg-slate-900/80 backdrop-blur border border-slate-700/50 rounded-2xl shadow-xl text-center pointer-events-none">
           <h2 className="text-sm font-bold text-white mb-1 font-display drop-shadow-md">{peerName}</h2>
           <p className="text-[10px] text-violet-400 capitalize mb-1 drop-shadow-md">{callType} Calling...</p>
@@ -433,14 +442,16 @@ export default function AudioVideoCall({
           {/* Picture-In-Picture Local Feed Window */}
           {!isVideoOff && !errorMsg && (
             <div className="absolute top-4 right-4 w-28 sm:w-44 h-44 sm:h-52 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 z-10">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{ transform: localPreviewTransform }}
-                className="w-full h-full object-contain bg-black"
-              />
+              <div className="w-full h-full flex items-center justify-center bg-black">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ transform: localPreviewTransform }}
+                  className="max-w-full max-h-full w-auto h-auto object-contain object-center bg-black"
+                />
+              </div>
               <div className="absolute bottom-3 left-2 px-1.5 py-1 bg-slate-950/60 rounded text-[9px] text-white">
                 You
               </div>
@@ -478,7 +489,7 @@ export default function AudioVideoCall({
             <p className="text-slate-400 text-xs mb-3">📍 {[peerCity, peerState].filter(Boolean).join(', ')}</p>
           )}
           <p className="text-indigo-400 text-xs tracking-wider uppercase font-semibold animate-pulse">
-             {callStatus === 'Connected' ? 'Active Audio Call' : 'Connecting...'}
+             {isCallConnected ? 'Active Audio Call' : 'Connecting...'}
           </p>
           <div className="w-16 h-1 bg-slate-800 rounded-full my-6 flex overflow-hidden">
              <span className="h-full bg-violet-500 animate-slide-wide w-1/2"></span>
