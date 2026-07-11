@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+# Exclude nested duplicate project folder
+remix_-vibechat\ \(18\)/remix_-vibechat\ \(18\)/
+remix_-vibechat\ \(18\)/

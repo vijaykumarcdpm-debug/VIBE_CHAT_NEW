@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Sync Active Source to GitHub",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"sync-to-github.js"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
