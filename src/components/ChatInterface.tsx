@@ -592,6 +592,25 @@ export default function ChatInterface({
     });
   };
 
+  const syncOnlineUsersFromSnapshot = (users: any[] = []) => {
+    const nextUsers = Array.isArray(users)
+      ? users.map((u: any) => ({
+          id: u.id,
+          username: u.username || '',
+          gender: u.gender || 'Other',
+          type: u.type || 'Guest',
+          profilePic: u.profilePic || '',
+          city: u.city || '',
+          state: u.state || '',
+          country: u.country || '',
+          bio: u.bio || '',
+          online: true
+        }))
+      : [];
+
+    setOnlineUsers(nextUsers);
+  };
+
   useEffect(() => {
     if (!me) return;
     setOnlineUsers(prev => {
@@ -904,6 +923,8 @@ export default function ChatInterface({
           if (activePartner && activePartner.id === data.senderId) {
             setPeerTyping(!!data.typing);
           }
+        } else if (event === 'presence:list') {
+          syncOnlineUsersFromSnapshot(Array.isArray(data?.users) ? data.users : []);
         } else if (event === 'chat:presence') {
           if (activePartner && activePartner.id === data.userId && data.focusing !== undefined) {
             setPartnerFocused(!!data.focusing);
@@ -912,7 +933,7 @@ export default function ChatInterface({
             setActivePartner(prev => prev ? { ...prev, online: !!data.online } : prev);
           }
           if (data.online !== undefined) {
-            console.log('RECEIVED PRESENCE', data.userId, data.online); updateOnlineUserList(data.userId, !!data.online, {
+            updateOnlineUserList(data.userId, !!data.online, {
               username: data.username,
               type: data.type,
               profilePic: data.profilePic,

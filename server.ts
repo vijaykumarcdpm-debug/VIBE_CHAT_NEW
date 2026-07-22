@@ -316,6 +316,23 @@ function sendWSMessage(userId: string, event: string, data: any) {
   }
 }
 
+function getOnlineUsersSnapshot() {
+  return dbManager.getUsers()
+    .filter((user) => user.online && user.id)
+    .map((user) => ({
+      id: user.id,
+      username: user.username || '',
+      gender: user.gender || 'Other',
+      type: user.type || 'Guest',
+      profilePic: user.profilePic || '',
+      city: user.city || '',
+      state: user.state || '',
+      country: user.country || '',
+      bio: user.bio || '',
+      online: true
+    }));
+}
+
 function broadcastPresence(userId: string, online: boolean) {
   const user = dbManager.getUser(userId);
   const payload = JSON.stringify({
@@ -333,6 +350,20 @@ function broadcastPresence(userId: string, online: boolean) {
   for (const [_, client] of ACTIVE_CONNECTIONS) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
+    }
+  }
+
+  const onlineSnapshot = getOnlineUsersSnapshot();
+  const snapshotPayload = JSON.stringify({
+    event: 'presence:list',
+    data: {
+      users: onlineSnapshot
+    }
+  });
+
+  for (const [_, client] of ACTIVE_CONNECTIONS) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(snapshotPayload);
     }
   }
 }

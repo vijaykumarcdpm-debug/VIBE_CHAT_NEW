@@ -178,8 +178,8 @@ const MatchingRoom: React.FC<MatchingRoomProps> = ({ ws, me, onExit, onTriggerVi
     : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-violet-500';
 
   return (
-    <div className={`absolute inset-0 flex flex-col items-center justify-center z-40 px-3 sm:px-4 py-4 sm:py-6 overflow-hidden ${isDarkMode ? 'bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.22),_transparent_45%),linear-gradient(135deg,_#020617_0%,_#0f172a_45%,_#030712_100%)]' : 'bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.14),_transparent_45%),linear-gradient(135deg,_#f8f7ff_0%,_#f5f3ff_45%,_#eef2ff_100%)]'}`}>
-      <div className={`relative w-full max-w-2xl mx-auto rounded-[2rem] border backdrop-blur-xl overflow-hidden ${shellClassName}`}>
+    <div className={`fixed inset-0 z-40 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 ${isDarkMode ? 'bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.22),_transparent_45%),linear-gradient(135deg,_#020617_0%,_#0f172a_45%,_#030712_100%)]' : 'bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.14),_transparent_45%),linear-gradient(135deg,_#f8f7ff_0%,_#f5f3ff_45%,_#eef2ff_100%)]'}`}>
+      <div className={`relative w-full max-w-2xl mx-auto rounded-[2rem] border backdrop-blur-xl ${shellClassName}`}>
         <div className={`absolute inset-0 bg-gradient-to-br ${isDarkMode ? 'from-violet-600/15 via-transparent to-indigo-600/10' : 'from-violet-500/10 via-transparent to-indigo-500/8'} pointer-events-none`} />
         <div className={`absolute -top-20 left-10 h-40 w-40 rounded-full ${isDarkMode ? 'bg-violet-500/20' : 'bg-violet-400/15'} blur-3xl`} />
         <div className={`absolute bottom-0 right-0 h-48 w-48 rounded-full ${isDarkMode ? 'bg-sky-500/10' : 'bg-sky-400/10'} blur-3xl`} />
@@ -207,7 +207,7 @@ const MatchingRoom: React.FC<MatchingRoomProps> = ({ ws, me, onExit, onTriggerVi
           </div>
 
           {chatState === 'searching' ? (
-            <div className={`rounded-[1.75rem] border p-6 sm:p-8 text-center space-y-5 animate-fade-in relative overflow-hidden ${panelClassName}`}>
+            <div className={`rounded-[1.75rem] border p-6 sm:p-8 text-center space-y-5 animate-fade-in relative ${panelClassName}`}>
               <div className={`absolute inset-0 ${isDarkMode ? 'bg-[radial-gradient(circle_at_center,_rgba(129,140,248,0.12),_transparent_70%)]' : 'bg-[radial-gradient(circle_at_center,_rgba(139,92,246,0.08),_transparent_70%)]'}`} />
               <div className="relative">
                 <span className={`absolute -inset-6 rounded-full ${isDarkMode ? 'bg-violet-600/20' : 'bg-violet-400/15'} animate-ping`}></span>

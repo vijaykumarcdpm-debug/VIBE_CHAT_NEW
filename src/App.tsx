@@ -1113,7 +1113,22 @@ export default function App() {
       try {
         const parsed = JSON.parse((ev as MessageEvent).data);
         const { event, data } = parsed;
-        if (event === 'chat:presence') {
+        if (event === 'presence:list') {
+          const users = Array.isArray(data?.users) ? data.users : [];
+          setPresenceUsers(users.map((u: any) => ({
+            id: u.id,
+            username: u.username || '',
+            gender: u.gender || 'Other',
+            type: u.type || 'Guest',
+            profilePic: u.profilePic || '',
+            city: u.city || '',
+            state: u.state || '',
+            country: u.country || '',
+            bio: u.bio || '',
+            online: true
+          })));
+          try { fetchStats(); } catch (e) {}
+        } else if (event === 'chat:presence') {
           const payload = data;
           setPresenceUsers(prev => {
             const existing = Array.isArray(prev) ? prev : [];
