@@ -116,8 +116,8 @@ function broadcastToAll(event: string, data: any) {
 }
 
 // Matchmaking execution - try perfect match first, then fallback to any match
-function searchMatches() {
-  if (MATCHING_QUEUE.length < 2) return;
+function searchMatches(): boolean {
+  if (MATCHING_QUEUE.length < 2) return false;
 
   let bestPair: { aIndex: number; bIndex: number; score: number } | null = null;
 
@@ -160,7 +160,7 @@ function searchMatches() {
     bestPair = { aIndex: 0, bIndex: 1, score: 0 };
   }
 
-  if (!bestPair) return;
+  if (!bestPair) return false;
 
   const { aIndex, bIndex } = bestPair;
   const userA = MATCHING_QUEUE[aIndex];
@@ -228,6 +228,7 @@ function searchMatches() {
   const matchedIndices = new Set<number>([aIndex, bIndex]);
   MATCHING_QUEUE = MATCHING_QUEUE.filter((_, index) => !matchedIndices.has(index));
   broadcastToAll('stats:update', getLiveStats());
+  return true;
 }
 
 function normalizeText(value: string): string {
@@ -1645,8 +1646,16 @@ WSS.on('connection', (ws: WebSocket, request: any, decodedUser: any) => {
           ws.send(JSON.stringify({ event: 'match:searching', data: {} }));
 
           // Attempt an immediate match when another candidate is present
+          let matched = false;
           if (MATCHING_QUEUE.length > 1) {
-            searchMatches();
+            matched = searchMatches();
+          }
+
+          if (!matched) {
+            ws.send(JSON.stringify({
+              event: 'match:none',
+              data: { message: 'No users available. Searching again...' }
+            }));
           }
         }
       }

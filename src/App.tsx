@@ -456,8 +456,13 @@ export default function App() {
   const [messageBanner, setMessageBanner] = useState<{ text: string; id: number } | null>(null);
 
   useEffect(() => {
+    const isVibeAppState = (state: any) => state && state.vibe_app === true;
+    const pushAppRootState = () => window.history.pushState({ vibe_app: true, appRoot: true }, "");
+    const pushAppGuardState = () => window.history.pushState({ vibe_app: true, appGuard: true }, "");
+
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
+        window.sessionStorage.removeItem('vibe_allow_quit');
         return;
       }
 
@@ -466,33 +471,30 @@ export default function App() {
         e.returnValue = 'You are in an active session. Are you sure you want to leave?';
         return e.returnValue;
       }
+
+      if (screenRef.current === 'lobby' && sidebarTabRef.current === 'people' && !showExitConfirmRef.current) {
+        // Let the Android back handler show the exit confirmation.
+      }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    try {
-      if (!window.history.state || !window.history.state.vibe_app) {
-        window.history.replaceState({ vibe_app: true, base: true }, "");
-        window.history.pushState({ vibe_app: true, trap: true }, "");
-      } else if (!window.history.state.trap) {
-        window.history.pushState({ vibe_app: true, trap: true }, "");
-      }
-    } catch(e) {}
+    if (!isVibeAppState(window.history.state)) {
+      pushAppRootState();
+      pushAppGuardState();
+    } else if (!window.history.state.appGuard) {
+      pushAppGuardState();
+    }
 
     const handlePopState = (e: PopStateEvent) => {
       if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
+        window.sessionStorage.removeItem('vibe_allow_quit');
         return;
       }
 
-      try {
-        window.history.pushState({ vibe_app: true, trap: true }, '');
-      } catch(e) {}
-
-      // Dispatch hardware back event so the global handleAndroidBack listener
-      // and any child components (like ChatInterface) can intercept it.
       const evt = new CustomEvent('app_hardware_back', { detail: { handled: false } });
       window.dispatchEvent(evt);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
 
     return () => {
@@ -501,8 +503,18 @@ export default function App() {
     };
   }, []);
 
-  // CRITICAL: Direct app_hardware_back handler
+  // CRITICAL: Direct app_hardware_back handler (backup for when popstate doesn't fire on Android)
   useEffect(() => {
+    const restoreAppGuard = () => {
+      try {
+        if (!window.history.state?.appGuard) {
+          window.history.pushState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
+        }
+      } catch (err) {
+        console.warn('Unable to restore app history state:', err);
+      }
+    };
+
     const markAndroidBackHandled = (evt: Event) => {
       try {
         window.sessionStorage.setItem('vibe_back_handled', 'true');
@@ -519,6 +531,7 @@ export default function App() {
       const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
       if (handled) {
         window.sessionStorage.removeItem('vibe_back_handled');
+        restoreAppGuard();
         return;
       }
 
@@ -533,7 +546,7 @@ export default function App() {
       if (showExitConfirmRef.current) {
         setShowExitConfirm(false);
         markAndroidBackHandled(evt);
-        
+        restoreAppGuard();
         return;
       }
 
@@ -542,7 +555,7 @@ export default function App() {
         if (showOwnProfileModalRef.current) setShowOwnProfileModal(false);
         if (showNotificationsDropdownRef.current) setShowNotificationsDropdown(false);
         markAndroidBackHandled(evt);
-        
+        restoreAppGuard();
         return;
       }
 
@@ -552,7 +565,7 @@ export default function App() {
         setScreen('lobby');
         setSidebarTab('people');
         markAndroidBackHandled(evt);
-        
+        restoreAppGuard();
         return;
       }
       if (outgoingCallRef.current) {
@@ -560,14 +573,14 @@ export default function App() {
         setScreen('lobby');
         setSidebarTab('people');
         markAndroidBackHandled(evt);
-        
+        restoreAppGuard();
         return;
       }
 
       if (activeCallRef.current) {
         handleHangupCall();
         markAndroidBackHandled(evt);
-        
+        restoreAppGuard();
         return;
       }
 
@@ -579,12 +592,13 @@ export default function App() {
         }
         setSidebarTab('people');
         markAndroidBackHandled(evt);
-        
+        restoreAppGuard();
         return;
       }
 
       setShowExitConfirm(true);
       markAndroidBackHandled(evt);
+      restoreAppGuard();
       
     };
 
@@ -1947,6 +1961,27 @@ export default function App() {
                 fetchLatestProfile();
                 showToast('Welcome back! Restoring your People Lobby session.');
               } else {
+                const invalidKeys = [
+                  'vibechat_rejoin_id',
+                  'vibechat_rejoin_token',
+                  'vibechat_rejoin_username',
+                  'vibechat_rejoin_type',
+                  'vibechat_rejoin_gender',
+                  'vibechat_rejoin_city',
+                  'vibechat_rejoin_state',
+                  'vibechat_rejoin_country',
+                  'vibechat_rejoin_bio',
+                  'vibechat_rejoin_age',
+                  'vibechat_rejoin_profilePic',
+                  'vibechat_rejoin_vipExpiresAt',
+                  'vibechat_rejoin_isModerator',
+                  'vibechat_rejoin_photoVerified',
+                  'vibechat_rejoin_createdAt'
+                ];
+
+                invalidKeys.forEach((key) => localStorage.removeItem(key));
+                setScreen('lobby');
+                setSidebarTab('people');
                 showToast('No stored guest session found. Please enter as guest.', true);
               }
             }}

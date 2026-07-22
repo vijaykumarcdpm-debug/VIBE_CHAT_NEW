@@ -99,10 +99,7 @@ export default function AudioVideoCall({
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia(constraints)
             .catch((e) => {
-              if (e.name === 'NotAllowedError') {
-                throw new Error('Media access denied. Please grant camera/microphone permissions, or open the app in a new tab.');
-              }
-              throw new Error(`Media access failed: ${e.message}`);
+              throw new Error(`Media access denied or not available. ${e.message}`);
             });
 
           if (!isComponentMounted) {
@@ -122,7 +119,7 @@ export default function AudioVideoCall({
           setCallStatus(isCaller ? 'Ringing...' : 'Connecting WebRTC...');
           setupWebRTC(stream);
         } else {
-          throw new Error('WebRTC API missing. If you are in a preview frame, please open the app in a new tab.');
+          throw new Error('WebRTC API missing or insecure context (HTTPS required)');
         }
 
       } catch (err: any) {
@@ -341,18 +338,6 @@ export default function AudioVideoCall({
       }));
     }
     onHangup();
-  };
-
-  const handleNextClick = () => {
-    if (ws) {
-      ws.send(JSON.stringify({
-        event: 'call:hangup',
-        data: { targetId: peerId }
-      }));
-    }
-    if (onNextMatch) {
-      onNextMatch();
-    }
   };
 
   return (
@@ -589,7 +574,7 @@ export default function AudioVideoCall({
         {/* Next Match button */}
         {onNextMatch && (
           <button
-            onClick={handleNextClick}
+            onClick={onNextMatch}
             title="Find Next Match"
             className="w-full lg:w-auto p-3 sm:p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full sm:rounded-xl transition duration-200 cursor-pointer text-xs font-bold"
           >

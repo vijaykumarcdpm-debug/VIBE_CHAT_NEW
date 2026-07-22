@@ -112,6 +112,25 @@ export default function HomePage({
   onToggleTheme,
   onRejoin
 }: HomePageProps) {
+  const hasValidRejoinSession = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+
+    const rejoinToken = localStorage.getItem('vibechat_rejoin_token');
+    const rejoinId = localStorage.getItem('vibechat_rejoin_id');
+    const rejoinUsername = localStorage.getItem('vibechat_rejoin_username');
+    const rejoinType = localStorage.getItem('vibechat_rejoin_type');
+    const deviceId = localStorage.getItem('vibechat_device_id');
+    const savedToken = localStorage.getItem('vibechat_token');
+    const savedRejoinToken = localStorage.getItem('vibechat_rejoin_token');
+
+    if (!rejoinToken && !savedToken && !savedRejoinToken) return false;
+    if (!rejoinToken && !savedToken) return false;
+    if (!rejoinId && !rejoinUsername) return false;
+
+    if (rejoinType === 'Guest' && !deviceId) return false;
+
+    return true;
+  }, []);
   const rejoinToken = typeof window !== 'undefined' ? localStorage.getItem('vibechat_rejoin_token') : null;
   const rejoinUsername = typeof window !== 'undefined' ? localStorage.getItem('vibechat_rejoin_username') : null;
   const rejoinType = typeof window !== 'undefined' ? localStorage.getItem('vibechat_rejoin_type') : null;
@@ -550,7 +569,7 @@ export default function HomePage({
                   <p className="text-xs text-slate-500">Select an entrance gateway to access the stranger lounge</p>
                 </div>
                 
-                {rejoinToken && rejoinUsername && (
+                {hasValidRejoinSession && rejoinToken && rejoinUsername && (
                   <div className="p-4 rounded-3xl bg-indigo-500/10 border border-indigo-500/30 animate-pulse-slow space-y-2 mt-4">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">⚡ One-Click Instant Rejoin</span>
