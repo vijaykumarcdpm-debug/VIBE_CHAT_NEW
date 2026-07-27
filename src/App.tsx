@@ -517,9 +517,7 @@ export default function App() {
     };
 
     const markAndroidBackHandled = (evt: Event) => {
-      try {
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
-      } catch (e) {}
+      catch (e) {}
       if (evt && typeof evt === 'object') {
         try {
           (evt as any).detail = (evt as any).detail || {};
@@ -530,11 +528,10 @@ export default function App() {
 
     const handleAndroidBack = (evt: Event) => {
       const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
-      if (handled) {
-        window.sessionStorage.removeItem('vibe_back_handled');
-        restoreAppGuard();
-        return;
-      }
+      if (evt && (evt as any).detail?.handled === true) {
+    restoreAppGuard();
+    return;
+}
 
       if (!isLoggedInRef.current) {
         // Join Gateway / unauthenticated entry should exit.
