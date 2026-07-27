@@ -669,7 +669,6 @@ export default function ChatInterface({
         if (customEvent && customEvent.detail) {
           customEvent.detail.handled = true;
         }
-        window.sessionStorage.setItem('vibe_back_handled', 'true');
       };
 
       if (dropdownOpenRef.current) {
