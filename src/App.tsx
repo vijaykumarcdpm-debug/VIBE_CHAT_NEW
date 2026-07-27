@@ -517,7 +517,6 @@ export default function App() {
     };
 
     const markAndroidBackHandled = (evt: Event) => {
-      catch (e) {}
       if (evt && typeof evt === 'object') {
         try {
           (evt as any).detail = (evt as any).detail || {};
