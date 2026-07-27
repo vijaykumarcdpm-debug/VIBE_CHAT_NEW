@@ -507,6 +507,7 @@ export default function App() {
   useEffect(() => {
     const restoreAppGuard = () => {
       try {
+        window.sessionStorage.removeItem('vibe_back_handled');
         if (!window.history.state?.appGuard) {
           window.history.pushState({ vibe_app: true, appGuard: true }, '', window.location.pathname);
         }
