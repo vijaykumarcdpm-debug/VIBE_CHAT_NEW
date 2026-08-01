@@ -486,15 +486,28 @@ export default function App() {
     }
 
     const handlePopState = (e: PopStateEvent) => {
-      if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
-        window.sessionStorage.removeItem('vibe_allow_quit');
-        return;
-      }
+  if (window.sessionStorage.getItem('vibe_allow_quit') === 'true') {
+    window.sessionStorage.removeItem('vibe_allow_quit');
+    return;
+  }
 
-      const evt = new CustomEvent('app_hardware_back', { detail: { handled: false } });
-      window.dispatchEvent(evt);
-    };
+  try {
+    if (!isVibeAppState(window.history.state)) {
+      pushAppRootState();
+      pushAppGuardState();
+    } else if (!window.history.state?.appGuard) {
+      pushAppGuardState();
+    }
+  } catch (err) {
+    console.warn('History guard restoration failed', err);
+  }
 
+  const evt = new CustomEvent('app_hardware_back', {
+    detail: { handled: false }
+  });
+
+  window.dispatchEvent(evt);
+};
     window.addEventListener('popstate', handlePopState);
 
     return () => {
