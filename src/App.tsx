@@ -525,9 +525,11 @@ export default function App() {
       }
     };
 
-    const handleAndroidBack = (evt: Event) => {
-      const handled = window.sessionStorage.getItem('vibe_back_handled') === 'true' || (evt && (evt as any).detail && (evt as any).detail.handled === true);
-      if (evt && (evt as any).detail?.handled === true) {
+   const handled =
+  window.sessionStorage.getItem('vibe_back_handled') === 'true';
+
+if (handled) {
+    window.sessionStorage.removeItem('vibe_back_handled');
     restoreAppGuard();
     return;
 }
