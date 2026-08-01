@@ -524,15 +524,17 @@ export default function App() {
         } catch (e) {}
       }
     };
+const handleAndroidBack = (evt: Event) => {
+  const handled =
+    window.sessionStorage.getItem('vibe_back_handled') === 'true';
 
-   const handled =
-  window.sessionStorage.getItem('vibe_back_handled') === 'true';
-
-if (handled) {
+  if (handled) {
     window.sessionStorage.removeItem('vibe_back_handled');
     restoreAppGuard();
     return;
-}
+  }
+
+  // ...all the rest of your existing code...
 
       if (!isLoggedInRef.current) {
         // Join Gateway / unauthenticated entry should exit.
